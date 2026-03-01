@@ -8,9 +8,17 @@ import uuid
 # ===== HARD STDIO SILENCE SETUP =====
 DEVNULL = open(os.devnull, "w")
 
+# save original OS-level fds
+STDOUT_FD = os.dup(1)
+STDERR_FD = os.dup(2)
+
 def silence_stdio():
-    os.dup2(DEVNULL.fileno(), sys.stdout.fileno())
-    os.dup2(DEVNULL.fileno(), sys.stderr.fileno())
+    os.dup2(DEVNULL.fileno(), 1)
+    os.dup2(DEVNULL.fileno(), 2)
+
+def restore_stdio():
+    os.dup2(STDOUT_FD, 1)
+    os.dup2(STDERR_FD, 2)
 
 # silence EVERYTHING by default
 silence_stdio()
@@ -147,9 +155,10 @@ def col(text, width):
 async def dashboard_loop():
     global startup_done
 
+    # restore real stdout/stderr ONCE
+    restore_stdio()
+
     # restore stdio ONLY for dashboard
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
 
     while not startup_done:
         await asyncio.sleep(1)
