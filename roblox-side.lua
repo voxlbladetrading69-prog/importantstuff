@@ -1,21 +1,26 @@
-local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
-local proxyUrl = "https://unpaid-slave.voxlblade-trading69.workers.dev/webhooks/1477552950942629889/2-7Dp7c_GJmKnQKdWeqNw0IGOU5l7CtOvlDKgRRQnjZ67NOwADW80WEDL11NNWRh4Q2Y"
+local INTERVAL = 30 -- seconds
+local FILE_NAME = "REJOINER.txt"
 
-local payload //help here please, implement the HWID, package stuff and yeah
-local success, response = pcall(function()
-	return HttpService:RequestAsync({
-		Url = proxyUrl,
-		Method = "POST",
-		Headers = {
-			["Content-Type"] = "application/json"
-		},
-		Body = HttpService:JSONEncode(payload)
-	})
-end)
+print("[HB] Local heartbeat writer started for", player.Name)
 
-if success then
-	print("Webhook sent:", response.StatusCode)
-else
-	warn("Failed to send webhook:", response)
+-- write initial heartbeat immediately
+local function writeHeartbeat()
+	local ts = os.time()
+	writefile(FILE_NAME, tostring(ts))
+	-- optional debug
+	-- print("[HB] Wrote timestamp:", ts)
 end
+
+-- first write (important so Termux doesn't see "never")
+writeHeartbeat()
+
+-- main loop
+while player.Parent ~= nil do
+	task.wait(INTERVAL)
+	writeHeartbeat()
+end
+
+print("[HB] Client shutting down:", player.Name)
