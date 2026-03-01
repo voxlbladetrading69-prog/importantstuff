@@ -4,6 +4,7 @@ import time
 import os
 import sys
 import uuid
+import shutil
 
 # ===== HARD STDIO SILENCE SETUP =====
 DEVNULL = open(os.devnull, "w")
@@ -62,7 +63,7 @@ last_seen = {pkg: None for pkg in PACKAGES}
 
 # ===== UTILS =====
 def clear_screen():
-    sys.stdout.write("\033[2J\033[H")
+    sys.stdout.write("\033c")  # full terminal reset
     sys.stdout.flush()
 
 # ===== ROBLOX CONTROL =====
@@ -148,27 +149,43 @@ async def watchdog_loop():
         await asyncio.sleep(CHECK_INTERVAL)
 
 # ===== DASHBOARD =====
+def term_width():
+    return shutil.get_terminal_size((80, 20)).columns
+
 def col(text, width):
-    text = "" if text is None else str(text)
-    return (text[: width - 1] + "…") if len(text) > width else text.ljust(width)
+    if text is None:
+        text = ""
+    text = str(text)
+
+    if len(text) > width:
+        return text[:width]
+    return text.ljust(width)
 
 async def dashboard_loop():
     global startup_done
 
-    # restore real stdout/stderr ONCE
+    # restore real stdout/stderr
     restore_stdio()
-
-    # restore stdio ONLY for dashboard
 
     while not startup_done:
         await asyncio.sleep(1)
 
     while True:
+        width = term_width()
+
+        # minimum width guard
+        if width < 60:
+            clear_screen()
+            print("Terminal too narrow. Enlarge window.")
+            await asyncio.sleep(1)
+            continue
+
         clear_screen()
         now = int(time.time())
 
-        print("Roblox Controller Dashboard")
-        print(f"Updated: {time.strftime('%H:%M:%S')}\n")
+        print("Roblox Controller Dashboard".ljust(width))
+        print(f"Updated: {time.strftime('%H:%M:%S')}".ljust(width))
+        print()
 
         header = (
             col("Package", 28) + "  " +
@@ -177,27 +194,34 @@ async def dashboard_loop():
             col("Age", 6)
         )
 
-        print(header)
-        print("-" * len(header))
+        print(header[:width])
+        print("-" * min(len(header), width))
 
         for pkg in PACKAGES:
             ts = last_seen[pkg]
+
             if ts is None:
-                print(col(pkg, 28) + "  DEAD     never       —")
-                continue
+                row = (
+                    col(pkg, 28) + "  " +
+                    col("DEAD", 8) + "  " +
+                    col("never", 10) + "  " +
+                    col("-", 6)
+                )
+            else:
+                age = now - ts
+                status = "OK" if age < TIMEOUT else "STALE"
+                last_seen_str = time.strftime("%H:%M:%S", time.localtime(ts))
+                m, s = divmod(age, 60)
+                age_str = f"{m}m{s}s" if m else f"{s}s"
 
-            age = now - ts
-            status = "OK" if age < TIMEOUT else "STALE"
-            last_seen_str = time.strftime("%H:%M:%S", time.localtime(ts))
-            m, s = divmod(age, 60)
-            age_str = f"{m}m{s}s" if m else f"{s}s"
+                row = (
+                    col(pkg, 28) + "  " +
+                    col(status, 8) + "  " +
+                    col(last_seen_str, 10) + "  " +
+                    col(age_str, 6)
+                )
 
-            print(
-                col(pkg, 28) + "  " +
-                col(status, 8) + "  " +
-                col(last_seen_str, 10) + "  " +
-                col(age_str, 6)
-            )
+            print(row[:width])
 
         await asyncio.sleep(5)
 
