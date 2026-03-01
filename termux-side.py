@@ -1,37 +1,22 @@
 import asyncio
+import curses
 import subprocess
 import time
 import os
-import sys
 import uuid
-import shutil
+import logging
 
-# ===== HARD STDIO SILENCE SETUP =====
-DEVNULL = open(os.devnull, "w")
-
-# save original OS-level fds
-STDOUT_FD = os.dup(1)
-STDERR_FD = os.dup(2)
-
-def silence_stdio():
-    os.dup2(DEVNULL.fileno(), 1)
-    os.dup2(DEVNULL.fileno(), 2)
-
-def restore_stdio():
-    os.dup2(STDOUT_FD, 1)
-    os.dup2(STDERR_FD, 2)
-
-# silence EVERYTHING by default
-silence_stdio()
-
-# ===== STATE =====
+# ===== STATE DIR =====
 STATE_DIR = os.path.expanduser("~/roblox_state")
 os.makedirs(STATE_DIR, exist_ok=True)
 
-HWID_FILE = os.path.join(STATE_DIR, "hwid")
-if not os.path.exists(HWID_FILE):
-    with open(HWID_FILE, "w") as f:
-        f.write(str(uuid.uuid4()))
+# ===== LOGGING =====
+LOG_FILE = os.path.join(STATE_DIR, "controller.log")
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
 
 # ===== CONFIG =====
 PACKAGES = [
@@ -47,31 +32,19 @@ PLACE_ID = "1537690962"
 BASE = "/storage/emulated/0/Android/data"
 REJOINER_REL = "files/gloop/external/Workspace/REJOINER.txt"
 
-SUBDIRS = [
-    "files/gloop/external/Workspace/atlas",
-    "files/gloop/external/Autoexecute",
-]
-
-TIMEOUT = 300
 CHECK_INTERVAL = 15
-SYNC_INTERVAL = 20
+TIMEOUT = 300
 LAUNCH_DELAY = 12
+RESTART_COOLDOWN = 600  # 10 minutes
 
 # ===== GLOBAL STATE =====
-startup_done = False
 last_seen = {pkg: None for pkg in PACKAGES}
-
-# ===== UTILS =====
-def clear_screen():
-    sys.stdout.write("\033c")  # full terminal reset
-    sys.stdout.flush()
+last_restart = {pkg: 0 for pkg in PACKAGES}
 
 # ===== ROBLOX CONTROL =====
 def hard_kill(pkg):
     subprocess.call(
-        ["su", "-c", f"cmd activity force-stop {pkg}"],
-        stdout=DEVNULL,
-        stderr=DEVNULL,
+        ["su", "-c", f"cmd activity force-stop {pkg} >/dev/null 2>&1"]
     )
 
 def launch(pkg):
@@ -79,49 +52,30 @@ def launch(pkg):
     time.sleep(2)
     subprocess.call(
         [
-            "am", "start",
-            "-a", "android.intent.action.VIEW",
-            "-d", f"roblox://placeId={PLACE_ID}",
-            pkg
-        ],
-        stdout=DEVNULL,
-        stderr=DEVNULL,
+            "su", "-c",
+            (
+                "am start "
+                "-a android.intent.action.VIEW "
+                f"-d roblox://placeId={PLACE_ID} {pkg} "
+                ">/dev/null 2>&1"
+            )
+        ]
     )
 
 async def restart(pkg):
+    logging.warning(f"Restarting {pkg}")
     await asyncio.sleep(LAUNCH_DELAY)
-    hard_kill(pkg)
-    await asyncio.sleep(2)
     launch(pkg)
-
-# ===== FILE SYNC =====
-def sync_files():
-    src_base = f"{BASE}/{PACKAGES[0]}"
-    for sub in SUBDIRS:
-        src = f"{src_base}/{sub}"
-        if not os.path.isdir(src):
-            continue
-        for pkg in PACKAGES[1:]:
-            dst = f"{BASE}/{pkg}/{sub}"
-            os.makedirs(dst, exist_ok=True)
-            subprocess.call(
-                ["rsync", "-a", "--delete", f"{src}/", f"{dst}/"],
-                stdout=DEVNULL,
-                stderr=DEVNULL,
-            )
-
-async def file_sync_loop():
-    while True:
-        sync_files()
-        await asyncio.sleep(SYNC_INTERVAL)
+    last_restart[pkg] = int(time.time())
 
 # ===== REJOINER =====
 def init_rejoiners():
     for pkg in PACKAGES:
         path = f"{BASE}/{pkg}/{REJOINER_REL}"
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w"):
-            pass  # blank init
+        if not os.path.exists(path):
+            with open(path, "w"):
+                pass
 
 async def poll_rejoiner_loop():
     while True:
@@ -132,117 +86,86 @@ async def poll_rejoiner_loop():
                     raw = f.read().strip()
                 if not raw:
                     continue
+
                 ts = int(raw)
                 if last_seen[pkg] is None or ts > last_seen[pkg]:
                     last_seen[pkg] = ts
             except Exception:
                 pass
+
         await asyncio.sleep(CHECK_INTERVAL)
 
 # ===== WATCHDOG =====
 async def watchdog_loop():
     while True:
         now = int(time.time())
+
         for pkg, ts in last_seen.items():
-            if ts is not None and now - ts > TIMEOUT:
+            if ts is None:
+                continue
+
+            age = now - ts
+            cooldown = now - last_restart[pkg]
+
+            if age > TIMEOUT and cooldown > RESTART_COOLDOWN:
+                logging.warning(
+                    f"{pkg} stale ({age}s), restarting"
+                )
                 await restart(pkg)
+
         await asyncio.sleep(CHECK_INTERVAL)
 
-# ===== DASHBOARD =====
-def term_width():
-    return shutil.get_terminal_size((80, 20)).columns
-
-def col(text, width):
-    if text is None:
-        text = ""
-    text = str(text)
-
-    if len(text) > width:
-        return text[:width]
-    return text.ljust(width)
-
-async def dashboard_loop():
-    global startup_done
-
-    # restore real stdout/stderr
-    restore_stdio()
-
-    while not startup_done:
-        await asyncio.sleep(1)
+# ===== CURSES UI =====
+async def ui_loop(stdscr):
+    curses.curs_set(0)
+    stdscr.nodelay(True)
 
     while True:
-        width = term_width()
-
-        # minimum width guard
-        if width < 60:
-            clear_screen()
-            print("Terminal too narrow. Enlarge window.")
-            await asyncio.sleep(1)
-            continue
-
-        clear_screen()
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
         now = int(time.time())
 
-        print("Roblox Controller Dashboard".ljust(width))
-        print(f"Updated: {time.strftime('%H:%M:%S')}".ljust(width))
-        print()
+        stdscr.addstr(0, 0, "Roblox Controller Dashboard")
+        stdscr.addstr(1, 0, f"Updated: {time.strftime('%H:%M:%S')}")
 
-        header = (
-            col("Package", 28) + "  " +
-            col("Status", 8) + "  " +
-            col("Last Seen", 10) + "  " +
-            col("Age", 6)
-        )
+        stdscr.addstr(3, 0, f"{'Package':28}  {'Status':8}  {'Age':6}")
 
-        print(header[:width])
-        print("-" * min(len(header), width))
-
+        row = 4
         for pkg in PACKAGES:
             ts = last_seen[pkg]
 
             if ts is None:
-                row = (
-                    col(pkg, 28) + "  " +
-                    col("DEAD", 8) + "  " +
-                    col("never", 10) + "  " +
-                    col("-", 6)
-                )
+                status = "DEAD"
+                age_str = "-"
             else:
                 age = now - ts
                 status = "OK" if age < TIMEOUT else "STALE"
-                last_seen_str = time.strftime("%H:%M:%S", time.localtime(ts))
-                m, s = divmod(age, 60)
-                age_str = f"{m}m{s}s" if m else f"{s}s"
+                age_str = f"{age}s"
 
-                row = (
-                    col(pkg, 28) + "  " +
-                    col(status, 8) + "  " +
-                    col(last_seen_str, 10) + "  " +
-                    col(age_str, 6)
-                )
+            line = f"{pkg:28}  {status:8}  {age_str:6}"
+            stdscr.addstr(row, 0, line[: w - 1])
+            row += 1
 
-            print(row[:width])
-
-        await asyncio.sleep(5)
+        stdscr.refresh()
+        await asyncio.sleep(1)
 
 # ===== MAIN =====
-async def main():
-    global startup_done
-
+async def async_main(stdscr):
     init_rejoiners()
 
-    asyncio.create_task(file_sync_loop())
-
     for pkg in PACKAGES:
+        logging.info(f"Launching {pkg}")
         await asyncio.sleep(LAUNCH_DELAY)
         launch(pkg)
-
-    startup_done = True
 
     await asyncio.gather(
         poll_rejoiner_loop(),
         watchdog_loop(),
-        dashboard_loop(),
+        ui_loop(stdscr),
     )
 
-asyncio.run(main())
+def main():
+    curses.wrapper(lambda stdscr: asyncio.run(async_main(stdscr)))
+
+if __name__ == "__main__":
+    main()
