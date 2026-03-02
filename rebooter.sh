@@ -1,9 +1,11 @@
-~/.termux/boot/
+# 1. Ensure boot directory exists
 mkdir -p ~/.termux/boot
+
+# 2. Create the boot script
 cat > ~/.termux/boot/start-termux-side.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Wait for system to fully boot
+# Wait for Android to fully boot
 sleep 10
 
 # Start tmux session if not already running
@@ -12,17 +14,20 @@ if ! tmux has-session -t myproject 2>/dev/null; then
         "python ~/myproject/termux/termux-side.py"
 fi
 EOF
-chmod +x ~/.termux/boot/start-myproject.sh
-nano ~/.bashrc
+
+# 3. Make it executable
+chmod +x ~/.termux/boot/start-termux-side.sh
+
+# 4. Auto-attach to tmux when opening Termux
+cat >> ~/.bashrc << 'EOF'
+
 # Auto-attach to myproject tmux session
 if command -v tmux >/dev/null 2>&1; then
     if tmux has-session -t myproject 2>/dev/null; then
         tmux attach -t myproject
     fi
 fi
-
-
-
+EOF
 
 
 
