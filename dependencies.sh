@@ -1,6 +1,6 @@
 pkg update && pkg upgrade -y \
 && pkg install -y python ncurses \
-&& pkg install tmux
+&& pkg install tmux \
 && pkg reinstall -y python \
 && termux-setup-storage \
 && mkdir -p ~/myproject/termux \
