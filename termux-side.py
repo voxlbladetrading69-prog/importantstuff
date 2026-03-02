@@ -1,4 +1,4 @@
-import asyncio
+    import asyncio
 import curses
 import subprocess
 import time
@@ -35,7 +35,12 @@ REJOINER_REL = "files/gloop/external/Workspace/REJOINER.txt"
 CHECK_INTERVAL = 15
 TIMEOUT = 300
 LAUNCH_DELAY = 12
-RESTART_COOLDOWN = 600  # 10 minutes
+RESTART_COOLDOWN = 300  # 10 minutes
+
+# ===== FILE MIRROR CONFIG =====
+SOURCE_PKG = PACKAGES[0]
+AUTOEXEC_REL = "files/gloop/external/Autoexecute"
+FILE_SYNC_INTERVAL = 20
 
 # ===== GLOBAL STATE =====
 last_seen = {pkg: None for pkg in PACKAGES}
@@ -68,6 +73,30 @@ async def restart(pkg):
     launch(pkg)
     last_restart[pkg] = int(time.time())
 
+def sync_autoexecute():
+    source = f"{BASE}/{SOURCE_PKG}/{AUTOEXEC_REL}"
+
+    if not os.path.isdir(source):
+        logging.warning("Autoexecute source missing, skipping sync")
+        return
+
+    for pkg in PACKAGES[1:]:
+        target = f"{BASE}/{pkg}/{AUTOEXEC_REL}"
+        os.makedirs(target, exist_ok=True)
+
+        subprocess.call(
+            [
+                "su", "-c",
+                (
+                    "rsync -a --delete "
+                    f"{source}/ {target}/ "
+                    ">/dev/null 2>&1"
+                )
+            ]
+        )
+
+    logging.info("Autoexecute sync complete")
+
 # ===== REJOINER =====
 def init_rejoiners():
     for pkg in PACKAGES:
@@ -76,7 +105,11 @@ def init_rejoiners():
         if not os.path.exists(path):
             with open(path, "w"):
                 pass
-
+async def file_sync_loop():
+    while True:
+        sync_autoexecute()
+        await asyncio.sleep(FILE_SYNC_INTERVAL)
+        
 async def poll_rejoiner_loop():
     while True:
         for pkg in PACKAGES:
@@ -161,6 +194,7 @@ async def async_main(stdscr):
     await asyncio.gather(
         poll_rejoiner_loop(),
         watchdog_loop(),
+        file_sync_loop(),   # ← added
         ui_loop(stdscr),
     )
 
