@@ -51,3 +51,4 @@ echo
 log "Next:"
 log "Run controller with:"
 log "python $TERMUX_SCRIPT_PATH"
+
