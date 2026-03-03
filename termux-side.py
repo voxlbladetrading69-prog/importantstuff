@@ -94,12 +94,16 @@ def sync_autoexecute() -> None:
         target = f"{BASE}/{pkg}/{AUTOEXEC_REL}"
         os.makedirs(target, exist_ok=True)
 
+        # 🔥 Step 1 — Delete roblox-side.lua before mirroring
+        lua_file = os.path.join(target, "roblox-side.lua")
+        run_su_command(f"rm -f {lua_file} >/dev/null 2>&1")
+
+        # 🚀 Step 2 — Mirror from source
         run_su_command(
             "rsync -a --delete "
             f"{source}/ {target}/ "
             ">/dev/null 2>&1"
         )
-
 
 # ===== REJOINER =====
 def init_rejoiners() -> None:
@@ -243,3 +247,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
