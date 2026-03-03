@@ -151,11 +151,10 @@ def incremental_sync():
             target = f"{BASE}/{pkg}/{subdir}"
             os.makedirs(target, exist_ok=True)
 
-            run_su_command(
-                "rsync -a --delete "
-                f"{source}/ {target}/ "
-                ">/dev/null 2>&1"
-            )
+            cmd = f'rsync -a --delete "{source}/" "{target}/"'
+            rc = run_su_command(cmd)
+            if rc != 0:
+                logging.error("Incremental sync failed for %s -> %s", source, target)
 
 # ===== REJOINER =====
 def init_rejoiners() -> None:
