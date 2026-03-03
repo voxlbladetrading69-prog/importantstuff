@@ -103,27 +103,59 @@ async def restart(pkg: str) -> None:
         logging.error("Failed to relaunch %s", pkg)
 
 
-def sync_autoexecute() -> None:
-    source = f"{BASE}/{SOURCE_PKG}/{AUTOEXEC_REL}"
+SUBDIRS = [
+    "files/gloop/external/Workspace/atlas",
+    "files/gloop/external/Autoexecute",
+]
 
-    if not os.path.isdir(source):
-        logging.warning("Autoexecute source missing, skipping sync: %s", source)
-        return
+def aggressive_initial_sync():
+    """Wipe and fully clone subdirectories from SOURCE_PKG."""
+    for subdir in SUBDIRS:
+        source = f"{BASE}/{SOURCE_PKG}/{subdir}"
 
-    for pkg in PACKAGES[1:]:
-        target = f"{BASE}/{pkg}/{AUTOEXEC_REL}"
-        os.makedirs(target, exist_ok=True)
+        if not os.path.isdir(source):
+            logging.warning("Source missing, skipping: %s", source)
+            continue
 
-        # 🔥 Step 1 — Delete roblox-side.lua before mirroring
-        lua_file = os.path.join(target, "roblox-side.lua")
-        run_su_command(f"rm -f {lua_file} >/dev/null 2>&1")
+        for pkg in PACKAGES:
+            if pkg == SOURCE_PKG:
+                continue
 
-        # 🚀 Step 2 — Mirror from source
-        run_su_command(
-            "rsync -a --delete "
-            f"{source}/ {target}/ "
-            ">/dev/null 2>&1"
-        )
+            target = f"{BASE}/{pkg}/{subdir}"
+
+            # 🧨 Delete entire subdirectory
+            run_su_command(f"rm -rf {target} >/dev/null 2>&1")
+
+            # 📁 Recreate and copy fresh
+            run_su_command(
+                f"mkdir -p {target} && "
+                f"rsync -a {source}/ {target}/ "
+                ">/dev/null 2>&1"
+            )
+
+            logging.info("Aggressively synced %s -> %s", source, target)
+
+
+def incremental_sync():
+    """Normal rsync updates after initial wipe."""
+    for subdir in SUBDIRS:
+        source = f"{BASE}/{SOURCE_PKG}/{subdir}"
+
+        if not os.path.isdir(source):
+            continue
+
+        for pkg in PACKAGES:
+            if pkg == SOURCE_PKG:
+                continue
+
+            target = f"{BASE}/{pkg}/{subdir}"
+            os.makedirs(target, exist_ok=True)
+
+            run_su_command(
+                "rsync -a --delete "
+                f"{source}/ {target}/ "
+                ">/dev/null 2>&1"
+            )
 
 # ===== REJOINER =====
 def init_rejoiners() -> None:
@@ -135,9 +167,9 @@ def init_rejoiners() -> None:
                 pass
 
 
-async def file_sync_loop() -> None:
+async def file_sync_loop():
     while not shutdown_event.is_set():
-        sync_autoexecute()
+        incremental_sync()
         await asyncio.sleep(FILE_SYNC_INTERVAL)
 
 
@@ -238,26 +270,28 @@ def request_shutdown(*_args) -> None:
 async def async_main(stdscr) -> None:
     init_rejoiners()
 
-    # 🚀 Start file syncer immediately
-    sync_task = asyncio.create_task(file_sync_loop())
+    # 🧨 Aggressive wipe first
+    aggressive_initial_sync()
 
-    # 🔥 Force one immediate sync before anything launches
-    sync_autoexecute()
+    # 🔥 START UI HERE (moved up)
+    ui_task = asyncio.create_task(ui_loop(stdscr))
+
+    # 🚀 Start file syncer
+    sync_task = asyncio.create_task(file_sync_loop())
 
     # Optional small delay to let filesystem settle
     await asyncio.sleep(2)
 
-    # 🎮 Now launch Roblox packages
+    # 🎮 Now launch Roblox packages (unchanged)
     for pkg in PACKAGES:
         logging.info("Launching %s", pkg)
         await asyncio.sleep(LAUNCH_DELAY)
         launch(pkg)
 
-    # Start remaining background tasks
+    # Start remaining background tasks (UI removed from here)
     other_tasks = [
         asyncio.create_task(poll_rejoiner_loop()),
         asyncio.create_task(watchdog_loop()),
-        asyncio.create_task(ui_loop(stdscr)),
     ]
 
     # Wait for shutdown
@@ -265,16 +299,18 @@ async def async_main(stdscr) -> None:
 
     # Cancel everything
     sync_task.cancel()
+    ui_task.cancel()
     for task in other_tasks:
         task.cancel()
 
     with suppress(asyncio.CancelledError):
         await sync_task
+    with suppress(asyncio.CancelledError):
+        await ui_task
 
     for task in other_tasks:
         with suppress(asyncio.CancelledError):
             await task
-
 
 def main() -> None:
     signal.signal(signal.SIGINT, request_shutdown)
@@ -284,6 +320,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
