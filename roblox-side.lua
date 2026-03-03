@@ -2,6 +2,7 @@ task.wait(5)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 local Character = player.Character or player.CharacterAdded:Wait()
@@ -13,25 +14,23 @@ local FILE_NAME = "REJOINER.txt"
 local running = true
 local lastStep = os.clock()
 
--- ===== MESSAGE HELPER =====
+-- ===== NOTIFICATION HELPER =====
 
-local function showMessage(text)
+local function notify(text)
 	task.spawn(function()
-		local msg = Instance.new("Message")
-		msg.Text = tostring(text)
-		msg.Parent = workspace
-
-		task.wait(2)
-
-		if msg then
-			msg:Destroy()
-		end
+		pcall(function()
+			StarterGui:SetCore("SendNotification", {
+				Title = "Heartbeat",
+				Text = tostring(text),
+				Duration = 2
+			})
+		end)
 	end)
 end
 
 -- ===== HEARTBEAT WRITER =====
 
-showMessage("[HB] Local heartbeat writer started for " .. player.Name)
+notify("Local heartbeat writer started for " .. player.Name)
 
 local function safeWriteHeartbeat()
 	local ts = os.time()
@@ -40,7 +39,7 @@ local function safeWriteHeartbeat()
 	end)
 
 	if not ok then
-		showMessage("[HB] Failed to write heartbeat")
+		notify("Failed to write heartbeat")
 		return false
 	end
 
@@ -50,13 +49,13 @@ end
 -- ===== stopping signals =====
 
 player.Kicked:Connect(function(reason)
-	showMessage("[HB] Kicked: " .. tostring(reason))
+	notify("Kicked: " .. tostring(reason))
 	running = false
 end)
 
 Players.PlayerRemoving:Connect(function(plr)
 	if plr == player then
-		showMessage("[HB] Player removing")
+		notify("Player removing")
 		running = false
 	end
 end)
@@ -74,12 +73,12 @@ while running do
 	task.wait(INTERVAL)
 
 	if not RunService:IsRunning() then
-		showMessage("[HB] Engine stopped")
+		notify("Engine stopped")
 		break
 	end
 
 	if os.clock() - lastStep > INTERVAL * FREEZE_FACTOR then
-		showMessage("[HB] Client frozen detected")
+		notify("Client freeze detected")
 		break
 	end
 
@@ -87,4 +86,4 @@ while running do
 end
 
 player:Kick("HAS STOPPED RUNNING ALREADY")
-showMessage("[HB] Heartbeat stopped for " .. player.Name)
+notify("Heartbeat stopped for " .. player.Name)
