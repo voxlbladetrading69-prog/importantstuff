@@ -65,13 +65,33 @@ def hard_kill(pkg: str) -> None:
 def launch(pkg: str) -> bool:
     hard_kill(pkg)
     time.sleep(2)
+
     rc = run_su_command(
         "am start "
         "-a android.intent.action.VIEW "
         f"-d roblox://placeId={PLACE_ID} {pkg} "
         ">/dev/null 2>&1"
     )
-    return rc == 0
+
+    if rc == 0:
+        # 🕒 Write fresh heartbeat immediately
+        now = int(time.time())
+        path = f"{BASE}/{pkg}/{REJOINER_REL}"
+
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(str(now))
+
+            last_seen[pkg] = now
+            logging.info("Initial heartbeat written for %s", pkg)
+
+        except OSError as exc:
+            logging.warning("Failed to write initial heartbeat for %s: %s", pkg, exc)
+
+        return True
+
+    return False
 
 
 async def restart(pkg: str) -> None:
@@ -264,5 +284,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
