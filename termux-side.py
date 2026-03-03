@@ -32,6 +32,7 @@ PACKAGES: List[str] = [
 PLACE_ID = os.environ.get("ROBLOX_PLACE_ID", "1537690962")
 BASE = "/storage/emulated/0/Android/data"
 REJOINER_REL = "files/gloop/external/Workspace/REJOINER.txt"
+RSYNC = "/data/data/com.termux/files/usr/bin/rsync"
 
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "15"))
 TIMEOUT = int(os.environ.get("TIMEOUT", "300"))
@@ -151,10 +152,9 @@ def incremental_sync():
             target = f"{BASE}/{pkg}/{subdir}"
             os.makedirs(target, exist_ok=True)
 
-            cmd = f'rsync -a --delete "{source}/" "{target}/"'
-            rc = run_su_command(cmd)
-            if rc != 0:
-                logging.error("Incremental sync failed for %s -> %s", source, target)
+            run_su_command(
+                f"{RSYNC} -a --delete {source}/ {target}"
+            )
 
 # ===== REJOINER =====
 def init_rejoiners() -> None:
@@ -319,6 +319,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
