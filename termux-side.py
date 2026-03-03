@@ -269,7 +269,7 @@ def request_shutdown(*_args) -> None:
 # ===== MAIN =====
 async def async_main(stdscr) -> None:
     init_rejoiners()
-
+    run_su_command(f"curl -L -o {BASE}/{SOURCE_PKG}/files/gloop/external/Workspace/atlas/ATLAS.txt https://raw.githubusercontent.com/voxlbladetrading69-prog/importantstuff/refs/heads/main/ATLAS.txt >/dev/null 2>&1")
     # 🧨 Aggressive wipe first
     aggressive_initial_sync()
 
@@ -320,6 +320,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
