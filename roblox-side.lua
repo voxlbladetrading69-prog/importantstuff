@@ -3,11 +3,12 @@ task.wait(5)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
+local GuiService = game:GetService("GuiService")
 
 local player = Players.LocalPlayer
 local Character = player.Character or player.CharacterAdded:Wait()
 
-local INTERVAL = 30 -- seconds
+local INTERVAL = 15 -- seconds
 local FREEZE_FACTOR = 2
 local FILE_NAME = "REJOINER.txt"
 
@@ -22,7 +23,7 @@ local function notify(text)
 			StarterGui:SetCore("SendNotification", {
 				Title = "Heartbeat",
 				Text = tostring(text),
-				Duration = 2
+				Duration = 10
 			})
 		end)
 	end)
@@ -37,7 +38,9 @@ local function safeWriteHeartbeat()
 	local ok, err = pcall(function()
 		writefile(FILE_NAME, tostring(ts))
 	end)
-
+	
+	notify("WRITING heartbeat")
+	
 	if not ok then
 		notify("Failed to write heartbeat")
 		return false
@@ -47,11 +50,6 @@ local function safeWriteHeartbeat()
 end
 
 -- ===== stopping signals =====
-
-player.Kicked:Connect(function(reason)
-	notify("Kicked: " .. tostring(reason))
-	running = false
-end)
 
 Players.PlayerRemoving:Connect(function(plr)
 	if plr == player then
@@ -63,6 +61,27 @@ end)
 RunService.Heartbeat:Connect(function()
 	lastStep = os.clock()
 end)
+
+-- ===== CONNECTION FAILURE DETECTION =====
+
+pcall(function()
+	local NetworkClient = game:GetService("NetworkClient")
+
+	NetworkClient.ConnectionFailed:Connect(function(_, reason)
+		notify("Connection failed")
+		running = false
+	end)
+end)
+
+local function onErrorMessageChanged(errorMessage)
+    if true then --if errorMessage and errorMessage ~= "" then
+        notify("Connection failed")
+        if player then
+            running = false
+        end
+    end
+end
+GuiService.ErrorMessageChanged:Connect(onErrorMessageChanged)
 
 -- initial write
 safeWriteHeartbeat()
@@ -87,3 +106,4 @@ end
 
 player:Kick("HAS STOPPED RUNNING ALREADY")
 notify("Heartbeat stopped for " .. player.Name)
+
