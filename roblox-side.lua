@@ -1,9 +1,10 @@
 task.wait(5)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Character = Player.Character or Player.CharacterAdded:Wait()
 
 local player = Players.LocalPlayer
+local Character = player.Character or player.CharacterAdded:Wait()
 
 local INTERVAL = 30 -- seconds
 local FREEZE_FACTOR = 2
@@ -12,7 +13,25 @@ local FILE_NAME = "REJOINER.txt"
 local running = true
 local lastStep = os.clock()
 
-print("[HB] Local heartbeat writer started for", player.Name)
+-- ===== MESSAGE HELPER =====
+
+local function showMessage(text)
+	task.spawn(function()
+		local msg = Instance.new("Message")
+		msg.Text = tostring(text)
+		msg.Parent = workspace
+
+		task.wait(2)
+
+		if msg then
+			msg:Destroy()
+		end
+	end)
+end
+
+-- ===== HEARTBEAT WRITER =====
+
+showMessage("[HB] Local heartbeat writer started for " .. player.Name)
 
 local function safeWriteHeartbeat()
 	local ts = os.time()
@@ -21,7 +40,7 @@ local function safeWriteHeartbeat()
 	end)
 
 	if not ok then
-		warn("[HB] Failed to write heartbeat:", err)
+		showMessage("[HB] Failed to write heartbeat")
 		return false
 	end
 
@@ -31,13 +50,13 @@ end
 -- ===== stopping signals =====
 
 player.Kicked:Connect(function(reason)
-	print("[HB] Kicked:", reason)
+	showMessage("[HB] Kicked: " .. tostring(reason))
 	running = false
 end)
 
 Players.PlayerRemoving:Connect(function(plr)
 	if plr == player then
-		print("[HB] Player removing")
+		showMessage("[HB] Player removing")
 		running = false
 	end
 end)
@@ -55,12 +74,12 @@ while running do
 	task.wait(INTERVAL)
 
 	if not RunService:IsRunning() then
-		print("[HB] Engine stopped")
+		showMessage("[HB] Engine stopped")
 		break
 	end
 
 	if os.clock() - lastStep > INTERVAL * FREEZE_FACTOR then
-		print("[HB] Client frozen detected")
+		showMessage("[HB] Client frozen detected")
 		break
 	end
 
@@ -68,5 +87,4 @@ while running do
 end
 
 player:Kick("HAS STOPPED RUNNING ALREADY")
-print("[HB] Heartbeat stopped for", player.Name)
-
+showMessage("[HB] Heartbeat stopped for " .. player.Name)
