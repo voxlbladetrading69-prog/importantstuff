@@ -6,6 +6,7 @@ BOOT_SCRIPT="$BOOT_DIR/start-controller.sh"
 PROJECT_SCRIPT="$HOME/myproject/termux/termux-side.py"
 LOG_FILE="$HOME/termux-side.log"
 
+rm -rf ~/.termux/boot
 mkdir -p "$BOOT_DIR"
 
 cat > "$BOOT_SCRIPT" <<EOF
@@ -31,3 +32,4 @@ chmod +x "$BOOT_SCRIPT"
 
 echo "✅ Modern boot script written to: $BOOT_SCRIPT"
 echo "✅ Logs will be written to: $LOG_FILE"
+
