@@ -1,5 +1,7 @@
+task.wait(5)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Character = Player.Character or Player.CharacterAdded:Wait()
 
 local player = Players.LocalPlayer
 
@@ -65,4 +67,6 @@ while running do
 	safeWriteHeartbeat()
 end
 
+player:Kick("HAS STOPPED RUNNING ALREADY")
 print("[HB] Heartbeat stopped for", player.Name)
+
