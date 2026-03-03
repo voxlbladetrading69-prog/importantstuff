@@ -32,7 +32,7 @@ PACKAGES: List[str] = [
 PLACE_ID = os.environ.get("ROBLOX_PLACE_ID", "1537690962")
 BASE = "/storage/emulated/0/Android/data"
 REJOINER_REL = "files/gloop/external/Workspace/REJOINER.txt"
-RSYNC = "/data/data/com.termux/files/usr/bin/rsync"
+RSYNC = "rsync"
 
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "15"))
 TIMEOUT = int(os.environ.get("TIMEOUT", "300"))
@@ -110,7 +110,7 @@ SUBDIRS = [
 ]
 
 def aggressive_initial_sync():
-    """Wipe and fully clone subdirectories from SOURCE_PKG."""
+    """Wipe and fully clone subdirectories from SOURCE_PKG (no root)."""
     for subdir in SUBDIRS:
         source = f"{BASE}/{SOURCE_PKG}/{subdir}"
 
@@ -124,21 +124,20 @@ def aggressive_initial_sync():
 
             target = f"{BASE}/{pkg}/{subdir}"
 
-            # 🧨 Delete entire subdirectory
-            run_su_command(f"rm -rf {target} >/dev/null 2>&1")
-
-            # 📁 Recreate and copy fresh
-            run_su_command(
-                f"mkdir -p {target} && "
-                f"rsync -a {source}/ {target}/ "
-                ">/dev/null 2>&1"
-            )
-
-            logging.info("Aggressively synced %s -> %s", source, target)
+            try:
+                subprocess.run(
+                    [RSYNC, "-a", "--delete", f"{source}/", f"{target}/"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+                logging.info("Synced %s -> %s", source, target)
+            except Exception as e:
+                logging.error("Initial sync failed for %s -> %s: %s", source, target, e)
 
 
 def incremental_sync():
-    """Normal rsync updates after initial wipe."""
+    """Normal rsync updates after initial wipe (no root)."""
     for subdir in SUBDIRS:
         source = f"{BASE}/{SOURCE_PKG}/{subdir}"
 
@@ -152,9 +151,15 @@ def incremental_sync():
             target = f"{BASE}/{pkg}/{subdir}"
             os.makedirs(target, exist_ok=True)
 
-            run_su_command(
-                f"{RSYNC} -a --delete {source}/ {target}"
-            )
+            try:
+                subprocess.run(
+                    [RSYNC, "-a", "--delete", f"{source}/", f"{target}/"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            except Exception as e:
+                logging.error("rsync failed for %s -> %s: %s", source, target, e)
 
 # ===== REJOINER =====
 def init_rejoiners() -> None:
@@ -319,6 +324,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
