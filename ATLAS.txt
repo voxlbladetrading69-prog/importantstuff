@@ -1,0 +1,66 @@
+if game.PlaceId ~= 1537690962 then 
+    print("NOT IN BEE SWARM BRO")
+end
+if not game:IsLoaded() then
+    game.Loaded:wait()
+end
+
+print("loading")
+task.wait(10)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local physProperties = PhysicalProperties.new(5,0,0,100,100)
+
+local function preLoad()
+    LocalPlayer.DevCameraOcclusionMode = "Invisicam"
+    LocalPlayer.CameraMaxZoomDistance = 100000
+    
+    for i,v in pairs(LocalPlayer.Character:GetChildren())do
+        if v:IsA("BasePart") then
+            v.CustomPhysicalProperties = physProperties
+            if v.Name ~= "HumanoidRootPart" then
+                v.Massless = true
+            end
+        end
+    end
+    
+    LocalPlayer.Character.ChildAdded:Connect(function(child)
+        if string.find(child.Name,"Bear") then
+            task.wait()
+            child:Destroy()
+        end
+    end)
+
+    local debounce = 0.05
+    local lastMove = tick()
+    local rayPar = RaycastParams.new()
+    rayPar.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayPar.FilterType = Enum.RaycastFilterType.Exclude
+
+    LocalPlayer.Character.HumanoidRootPart.Touched:Connect(function(part)
+        local Hum = LocalPlayer.Character.Humanoid
+        local State = Hum:GetState()
+        if part:isDescendantOf(Hum.Parent) == true then return end
+	if part.Anchored == false then return end
+        if State ~= Enum.HumanoidStateType.Freefall then return end
+        if part.Parent.Name == "GhostPlayerParts" then return end
+        if tick() - lastMove < debounce then return end
+        local rayRes = game.Workspace:Raycast(Hum.Parent.HumanoidRootPart.Position,Vector3.new(0,-4,0),rayPar)
+        if rayRes == nil then return end
+        lastMove = tick()
+        Hum.Parent.HumanoidRootPart.CFrame = Hum.Parent.HumanoidRootPart.CFrame + Vector3.new(0,4,0)
+    end)
+    
+    print("RESPAWNE D")
+end
+
+print("loaded")
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Chris12089/atlasbss/main/script.lua"))()
+
+task.wait(5)
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(5)
+    preLoad()
+end)
+preLoad()
