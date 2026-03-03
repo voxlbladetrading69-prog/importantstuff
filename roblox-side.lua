@@ -4,12 +4,27 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 local INTERVAL = 30 -- seconds
+local FREEZE_FACTOR = 2
 local FILE_NAME = "REJOINER.txt"
 
 local running = true
 local lastStep = os.clock()
 
 print("[HB] Local heartbeat writer started for", player.Name)
+
+local function safeWriteHeartbeat()
+	local ts = os.time()
+	local ok, err = pcall(function()
+		writefile(FILE_NAME, tostring(ts))
+	end)
+
+	if not ok then
+		warn("[HB] Failed to write heartbeat:", err)
+		return false
+	end
+
+	return true
+end
 
 -- ===== stopping signals =====
 
@@ -25,39 +40,29 @@ Players.PlayerRemoving:Connect(function(plr)
 	end
 end)
 
--- detect client freeze / engine stall
 RunService.Heartbeat:Connect(function()
 	lastStep = os.clock()
 end)
 
--- ===== heartbeat writer =====
-
-local function writeHeartbeat()
-	local ts = os.time()
-	writefile(FILE_NAME, tostring(ts))
-end
-
 -- initial write
-writeHeartbeat()
+safeWriteHeartbeat()
 
 -- ===== main loop =====
 
 while running do
 	task.wait(INTERVAL)
 
-	-- engine no longer running
 	if not RunService:IsRunning() then
 		print("[HB] Engine stopped")
 		break
 	end
 
-	-- client frozen (no Heartbeat for too long)
-	if os.clock() - lastStep > INTERVAL * 2 then
+	if os.clock() - lastStep > INTERVAL * FREEZE_FACTOR then
 		print("[HB] Client frozen detected")
 		break
 	end
 
-	writeHeartbeat()
+	safeWriteHeartbeat()
 end
 
 print("[HB] Heartbeat stopped for", player.Name)

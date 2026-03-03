@@ -1,36 +1,57 @@
 #!/data/data/com.termux/files/usr/bin/bash
-set -e  # exit on any error
+set -Eeuo pipefail
 
-echo "📦 Updating Termux packages..."
-pkg update -y && pkg upgrade -y
+log() {
+  printf '%s\n' "$*"
+}
 
-echo "📦 Installing required packages..."
-pkg install -y python rsync tmux
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    log "❌ Missing required command: $1"
+    exit 1
+  }
+}
 
-echo "🔧 Setting up storage access..."
-termux-setup-storage
+PROJECT_DIR="$HOME/myproject/termux"
+SOURCE_PKG="com.roblox.clienu"
+AUTOEXEC_DIR="/storage/emulated/0/Android/data/$SOURCE_PKG/files/gloop/external/Autoexecute"
+TERMUX_SCRIPT_PATH="$PROJECT_DIR/termux-side.py"
+ROBLOX_SCRIPT_PATH="$AUTOEXEC_DIR/roblox-side.lua"
+TERMUX_SCRIPT_URL="https://raw.githubusercontent.com/voxlbladetrading69-prog/importantstuff/refs/heads/main/termux-side.py"
+ROBLOX_SCRIPT_URL="https://raw.githubusercontent.com/voxlbladetrading69-prog/importantstuff/refs/heads/main/roblox-side.lua"
 
-echo "📁 Creating project directories..."
-mkdir -p ~/myproject/termux
+log "📦 Updating Termux packages..."
+pkg update -y
+pkg upgrade -y
 
-# Ensure the target Autoexecute directory exists (parent may not exist)
-AUTOEXEC_DIR="/storage/emulated/0/Android/data/com.roblox.clienu/files/gloop/external/Autoexecute"
+log "📦 Installing required packages..."
+pkg install -y python rsync tmux termux-tools curl
+
+require_cmd curl
+require_cmd python
+
+if command -v termux-setup-storage >/dev/null 2>&1; then
+  log "🔧 Setting up storage access (may prompt once)..."
+  termux-setup-storage || log "⚠️ termux-setup-storage returned non-zero; continuing"
+else
+  log "⚠️ termux-setup-storage is unavailable; grant storage access manually if needed"
+fi
+
+log "📁 Creating project directories..."
+mkdir -p "$PROJECT_DIR"
 mkdir -p "$AUTOEXEC_DIR"
 
-echo "⬇️ Downloading controller script (Termux side)..."
-curl -L "https://raw.githubusercontent.com/voxlbladetrading69-prog/importantstuff/refs/heads/main/termux-side.py" \
-     -o ~/myproject/termux/termux-side.py
+log "⬇️ Downloading controller script (Termux side)..."
+curl --fail --show-error --location "$TERMUX_SCRIPT_URL" -o "$TERMUX_SCRIPT_PATH"
 
-echo "⬇️ Downloading Autoexecute script (Roblox side)..."
-curl -L "https://raw.githubusercontent.com/voxlbladetrading69-prog/importantstuff/refs/heads/main/roblox-side.lua" \
-     -o "$AUTOEXEC_DIR/roblox-side.lua"
+log "⬇️ Downloading Autoexecute script (Roblox side)..."
+curl --fail --show-error --location "$ROBLOX_SCRIPT_URL" -o "$ROBLOX_SCRIPT_PATH"
 
-echo "✅ Setup complete!"
-echo ""
-echo "⚠️  Next steps:"
-echo "   1. Make sure your device is rooted and Termux has root permissions."
-echo "   2. Test that 'rsync' is available to root:   su -c \"which rsync\""
-echo "      If it fails, you may need to symlink it:"
-echo "         su -c \"ln -s /data/data/com.termux/files/usr/bin/rsync /system/bin/rsync\""
-echo "   3. Run the controller:   python ~/myproject/termux/termux-side.py"
-echo "   4. (Optional) Use tmux to keep it running:   tmux new-session -s roblox 'python ~/myproject/termux/termux-side.py'"
+log "✅ Setup complete"
+printf '\n'
+log "⚠️  Next steps:"
+log "   1. Ensure device is rooted and Termux has root permissions."
+log "   2. Verify rsync is available to root: su -c \"which rsync\""
+log "      If needed: su -c \"ln -s /data/data/com.termux/files/usr/bin/rsync /system/bin/rsync\""
+log "   3. Run controller: python $TERMUX_SCRIPT_PATH"
+log "   4. Optional tmux: tmux new-session -s roblox 'python $TERMUX_SCRIPT_PATH'"
