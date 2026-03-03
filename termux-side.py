@@ -218,23 +218,40 @@ def request_shutdown(*_args) -> None:
 async def async_main(stdscr) -> None:
     init_rejoiners()
 
+    # 🚀 Start file syncer immediately
+    sync_task = asyncio.create_task(file_sync_loop())
+
+    # 🔥 Force one immediate sync before anything launches
+    sync_autoexecute()
+
+    # Optional small delay to let filesystem settle
+    await asyncio.sleep(2)
+
+    # 🎮 Now launch Roblox packages
     for pkg in PACKAGES:
         logging.info("Launching %s", pkg)
         await asyncio.sleep(LAUNCH_DELAY)
         launch(pkg)
 
-    tasks = [
+    # Start remaining background tasks
+    other_tasks = [
         asyncio.create_task(poll_rejoiner_loop()),
         asyncio.create_task(watchdog_loop()),
-        asyncio.create_task(file_sync_loop()),
         asyncio.create_task(ui_loop(stdscr)),
     ]
 
+    # Wait for shutdown
     await shutdown_event.wait()
 
-    for task in tasks:
+    # Cancel everything
+    sync_task.cancel()
+    for task in other_tasks:
         task.cancel()
-    for task in tasks:
+
+    with suppress(asyncio.CancelledError):
+        await sync_task
+
+    for task in other_tasks:
         with suppress(asyncio.CancelledError):
             await task
 
@@ -247,4 +264,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
