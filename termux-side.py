@@ -7,7 +7,11 @@ import subprocess
 import time
 from contextlib import suppress
 from typing import Dict, List, Optional
-
+import discord
+from discord.ext import commands
+import redis.asyncio as redis
+import socket
+import uuid
 # ===== STATE DIR =====
 STATE_DIR = os.path.expanduser(os.environ.get("ROBLOX_STATE_DIR", "~/roblox_state"))
 os.makedirs(STATE_DIR, exist_ok=True)
@@ -39,6 +43,21 @@ TIMEOUT = int(os.environ.get("TIMEOUT", "300"))
 LAUNCH_DELAY = int(os.environ.get("LAUNCH_DELAY", "12"))
 RESTART_COOLDOWN = int(os.environ.get("RESTART_COOLDOWN", "300"))
 
+# ===== BOT CONFIGS =====
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
+COMMAND_PREFIX = "!"
+intents = discord.Intents.default()
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
+# ===== REDIS CONFIG =====
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+CLIENT_HWID = os.environ.get("CLIENT_HWID")
+
+if not CLIENT_HWID:
+    CLIENT_HWID = socket.gethostname() + "-" + str(uuid.uuid4())[:8]
+
+REDIS_CHANNEL = f"controller.{CLIENT_HWID}"
+REDIS_BROADCAST = "controller.broadcast"
+
 # ===== FILE MIRROR CONFIG =====
 SOURCE_PKG = PACKAGES[0]
 AUTOEXEC_REL = "files/gloop/external/Autoexecute"
@@ -48,7 +67,7 @@ FILE_SYNC_INTERVAL = int(os.environ.get("FILE_SYNC_INTERVAL", "20"))
 last_seen: Dict[str, Optional[int]] = {pkg: None for pkg in PACKAGES}
 last_restart: Dict[str, int] = {pkg: 0 for pkg in PACKAGES}
 shutdown_event = asyncio.Event()
-
+redis_client = None
 
 def run_su_command(cmd: str) -> int:
     """Run root command and log non-zero exits."""
@@ -219,8 +238,55 @@ async def watchdog_loop() -> None:
                 await restart(pkg)
 
         await asyncio.sleep(CHECK_INTERVAL)
+# ===== REDIS =====
+async def redis_connect():
+    global redis_client
 
+    redis_client = redis.from_url(
+        REDIS_URL,
+        decode_responses=True,
+    )
 
+    try:
+        await redis_client.ping()
+        logging.info("Connected to Redis")
+    except Exception as e:
+        logging.error("Redis connection failed: %s", e)
+        raise
+        
+async def redis_listener_loop():
+    pubsub = redis_client.pubsub()
+
+    await pubsub.subscribe(REDIS_CHANNEL, REDIS_BROADCAST)
+
+    logging.info(
+        "Subscribed to Redis channels: %s, %s",
+        REDIS_CHANNEL,
+        REDIS_BROADCAST,
+    )
+
+    async for message in pubsub.listen():
+        if shutdown_event.is_set():
+            break
+
+        if message["type"] != "message":
+            continue
+
+        channel = message["channel"]
+        data = message["data"]
+
+        logging.info("Redis message on %s: %s", channel, data)
+
+        # Commands will be handled here later
+
+async def redis_register():
+    try:
+        await redis_client.sadd("controllers", CLIENT_HWID)
+        await redis_client.set(f"controller:{CLIENT_HWID}:status", "online")
+        logging.info("Registered controller %s", CLIENT_HWID)
+    except Exception as e:
+        logging.warning("Redis register failed: %s", e)
+        
 # ===== CURSES UI =====
 async def ui_loop(stdscr) -> None:
     with suppress(curses.error):
@@ -324,6 +390,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
