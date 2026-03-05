@@ -1,5 +1,6 @@
 import asyncio
 import curses
+import fcntl
 import logging
 import os
 import signal
@@ -49,6 +50,39 @@ last_seen: Dict[str, Optional[int]] = {pkg: None for pkg in PACKAGES}
 last_restart: Dict[str, int] = {pkg: 0 for pkg in PACKAGES}
 shutdown_event = asyncio.Event()
 
+LOCK_FILE = os.path.join(STATE_DIR, "controller.lock")
+lock_fd: Optional[int] = None
+
+
+def acquire_singleton_lock() -> None:
+    """Prevent multiple controller instances from running."""
+    global lock_fd
+    lock_fd = os.open(LOCK_FILE, os.O_CREAT | os.O_RDWR, 0o644)
+
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise RuntimeError("Another controller instance is already running")
+
+    os.ftruncate(lock_fd, 0)
+    os.write(lock_fd, str(os.getpid()).encode("utf-8"))
+
+
+def release_singleton_lock() -> None:
+    """Release singleton lock file."""
+    global lock_fd
+
+    if lock_fd is None:
+        return
+
+    with suppress(OSError):
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+
+    with suppress(OSError):
+        os.close(lock_fd)
+
+    lock_fd = None
+
 
 def run_su_command(cmd: str) -> int:
     """Run root command and log non-zero exits."""
@@ -75,12 +109,12 @@ def launch(pkg: str) -> bool:
     )
 
     if rc == 0:
-        # 🕒 Write fresh heartbeat immediately
         now = int(time.time())
         path = f"{BASE}/{pkg}/{REJOINER_REL}"
 
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
+
             with open(path, "w", encoding="utf-8") as f:
                 f.write(str(now))
 
@@ -97,7 +131,9 @@ def launch(pkg: str) -> bool:
 
 async def restart(pkg: str) -> None:
     logging.warning("Restarting %s", pkg)
+
     await asyncio.sleep(LAUNCH_DELAY)
+
     if launch(pkg):
         last_restart[pkg] = int(time.time())
     else:
@@ -109,8 +145,8 @@ SUBDIRS = [
     "files/gloop/external/Autoexecute",
 ]
 
+
 def aggressive_initial_sync():
-    """Wipe and fully clone subdirectories from SOURCE_PKG (no root)."""
     for subdir in SUBDIRS:
         source = f"{BASE}/{SOURCE_PKG}/{subdir}"
 
@@ -131,13 +167,14 @@ def aggressive_initial_sync():
                     stderr=subprocess.DEVNULL,
                     check=False,
                 )
+
                 logging.info("Synced %s -> %s", source, target)
+
             except Exception as e:
                 logging.error("Initial sync failed for %s -> %s: %s", source, target, e)
 
 
 def incremental_sync():
-    """Normal rsync updates after initial wipe (no root)."""
     for subdir in SUBDIRS:
         source = f"{BASE}/{SOURCE_PKG}/{subdir}"
 
@@ -158,14 +195,18 @@ def incremental_sync():
                     stderr=subprocess.DEVNULL,
                     check=False,
                 )
+
             except Exception as e:
                 logging.error("rsync failed for %s -> %s: %s", source, target, e)
+
 
 # ===== REJOINER =====
 def init_rejoiners() -> None:
     for pkg in PACKAGES:
         path = f"{BASE}/{pkg}/{REJOINER_REL}"
+
         os.makedirs(os.path.dirname(path), exist_ok=True)
+
         if not os.path.exists(path):
             with open(path, "w", encoding="utf-8"):
                 pass
@@ -179,9 +220,13 @@ async def file_sync_loop():
 
 async def poll_rejoiner_loop() -> None:
     while not shutdown_event.is_set():
+
         for pkg in PACKAGES:
+
             path = f"{BASE}/{pkg}/{REJOINER_REL}"
+
             raw = ""
+
             try:
                 with open(path, encoding="utf-8") as f:
                     raw = f.read().strip()
@@ -190,12 +235,16 @@ async def poll_rejoiner_loop() -> None:
                     continue
 
                 ts = int(raw)
+
                 if last_seen[pkg] is None or ts > int(last_seen[pkg]):
                     last_seen[pkg] = ts
+
             except FileNotFoundError:
                 logging.warning("Rejoiner file missing for %s", pkg)
+
             except ValueError:
                 logging.warning("Invalid heartbeat content for %s: %r", pkg, raw)
+
             except OSError as exc:
                 logging.warning("Cannot read heartbeat for %s: %s", pkg, exc)
 
@@ -204,10 +253,13 @@ async def poll_rejoiner_loop() -> None:
 
 # ===== WATCHDOG =====
 async def watchdog_loop() -> None:
+
     while not shutdown_event.is_set():
+
         now = int(time.time())
 
         for pkg, ts in last_seen.items():
+
             if ts is None:
                 continue
 
@@ -223,11 +275,14 @@ async def watchdog_loop() -> None:
 
 # ===== CURSES UI =====
 async def ui_loop(stdscr) -> None:
+
     with suppress(curses.error):
         curses.curs_set(0)
+
     stdscr.nodelay(True)
 
     while not shutdown_event.is_set():
+
         stdscr.erase()
         _, width = stdscr.getmaxyx()
         now = int(time.time())
@@ -238,19 +293,25 @@ async def ui_loop(stdscr) -> None:
             stdscr.addstr(3, 0, f"{'Package':28}  {'Status':8}  {'Age':6}")
 
         row = 4
+
         for pkg in PACKAGES:
+
             ts = last_seen[pkg]
+
             if ts is None:
                 status = "DEAD"
                 age_str = "-"
+
             else:
                 age = now - ts
                 status = "OK" if age < TIMEOUT else "STALE"
                 age_str = f"{age}s"
 
             line = f"{pkg:28}  {status:8}  {age_str:6}"
+
             with suppress(curses.error):
                 stdscr.addstr(row, 0, line[: max(width - 1, 1)])
+
             row += 1
 
         with suppress(curses.error):
@@ -258,6 +319,7 @@ async def ui_loop(stdscr) -> None:
             stdscr.refresh()
 
         key = stdscr.getch()
+
         if key in (ord("q"), ord("Q")):
             shutdown_event.set()
             break
@@ -272,62 +334,84 @@ def request_shutdown(*_args) -> None:
 
 # ===== MAIN =====
 async def async_main(stdscr) -> None:
+
     init_rejoiners()
-    run_su_command(f"curl -L -o {BASE}/{SOURCE_PKG}/files/gloop/external/Workspace/atlas/ATLAS.txt https://raw.githubusercontent.com/voxlbladetrading69-prog/importantstuff/refs/heads/main/ATLAS.txt >/dev/null 2>&1")
-    # 🧨 Aggressive wipe first
+
+    run_su_command(
+        f"curl -L -o {BASE}/{SOURCE_PKG}/files/gloop/external/Workspace/atlas/ATLAS.txt "
+        "https://raw.githubusercontent.com/voxlbladetrading69-prog/importantstuff/refs/heads/main/ATLAS.txt "
+        ">/dev/null 2>&1"
+    )
+
     aggressive_initial_sync()
 
-    # 🔥 START UI HERE (moved up)
     ui_task = asyncio.create_task(ui_loop(stdscr))
-
-    # 🚀 Start file syncer
     sync_task = asyncio.create_task(file_sync_loop())
 
-    # Optional small delay to let filesystem settle
-    await asyncio.sleep(2)
+    other_tasks: List[asyncio.Task] = []
 
-    # 🎮 Now launch Roblox packages (unchanged)
-    for pkg in PACKAGES:
-        logging.info("Launching %s", pkg)
-        await asyncio.sleep(LAUNCH_DELAY)
-        launch(pkg)
+    try:
 
-    # Start remaining background tasks (UI removed from here)
-    other_tasks = [
-        asyncio.create_task(poll_rejoiner_loop()),
-        asyncio.create_task(watchdog_loop()),
-    ]
+        await asyncio.sleep(2)
 
-    # Wait for shutdown
-    await shutdown_event.wait()
+        for pkg in PACKAGES:
+            logging.info("Launching %s", pkg)
+            await asyncio.sleep(LAUNCH_DELAY)
+            launch(pkg)
 
-    # Cancel everything
-    sync_task.cancel()
-    ui_task.cancel()
-    for task in other_tasks:
-        task.cancel()
+        other_tasks = [
+            asyncio.create_task(poll_rejoiner_loop()),
+            asyncio.create_task(watchdog_loop()),
+        ]
 
-    with suppress(asyncio.CancelledError):
-        await sync_task
-    with suppress(asyncio.CancelledError):
-        await ui_task
+        await shutdown_event.wait()
 
-    for task in other_tasks:
+    finally:
+
+        shutdown_event.set()
+
+        sync_task.cancel()
+        ui_task.cancel()
+
+        for task in other_tasks:
+            task.cancel()
+
         with suppress(asyncio.CancelledError):
-            await task
+            await sync_task
+
+        with suppress(asyncio.CancelledError):
+            await ui_task
+
+        for task in other_tasks:
+            with suppress(asyncio.CancelledError):
+                await task
+
 
 def main() -> None:
+
+    try:
+        acquire_singleton_lock()
+
+    except RuntimeError as exc:
+        logging.error(str(exc))
+        print(str(exc))
+        return
+
     signal.signal(signal.SIGINT, request_shutdown)
     signal.signal(signal.SIGTERM, request_shutdown)
-    curses.wrapper(lambda stdscr: asyncio.run(async_main(stdscr)))
+
+    with suppress(AttributeError):
+        signal.signal(signal.SIGHUP, request_shutdown)
+
+    with suppress(AttributeError):
+        signal.signal(signal.SIGQUIT, request_shutdown)
+
+    try:
+        curses.wrapper(lambda stdscr: asyncio.run(async_main(stdscr)))
+
+    finally:
+        release_singleton_lock()
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
