@@ -104,7 +104,7 @@ def launch(pkg: str) -> bool:
     rc = run_su_command(
         "am start "
         "-a android.intent.action.VIEW "
-        f"-d roblox://placeId={PLACE_ID} {pkg} "
+        f"-d roblox://placeId={PLACE_ID}&linkCode=e54e53d5363d9f4e83bccc971590fa12 {pkg}"
         ">/dev/null 2>&1"
     )
 
