@@ -105,7 +105,8 @@ def launch(pkg: str) -> bool:
         f"am start -n {pkg}/com.roblox.client.startup.ActivitySplash; "
         f"sleep 5; "
         f"am start -a android.intent.action.VIEW "
-        f"-d 'https://www.roblox.com/share?code=e54e53d5363d9f4e83bccc971590fa12&type=Server' "
+        f"-d 'roblox://placeId={PLACE_ID}' "
+        # f"-d 'https://www.roblox.com/share?code=e54e53d5363d9f4e83bccc971590fa12&type=Server' "
         f"-p {pkg} "
         ">/dev/null 2>&1"
     )
@@ -290,7 +291,7 @@ async def ui_loop(stdscr) -> None:
         now = int(time.time())
 
         with suppress(curses.error):
-            stdscr.addstr(0, 0, "Roblox Controller Dashboard v2")
+            stdscr.addstr(0, 0, "Roblox Controller Dashboard v2 - Commercial")
             stdscr.addstr(1, 0, f"Updated: {time.strftime('%H:%M:%S')}")
             stdscr.addstr(3, 0, f"{'Package':28}  {'Status':8}  {'Age':6}")
 
