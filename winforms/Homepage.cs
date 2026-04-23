@@ -24,8 +24,10 @@ namespace Opus
         string activePanel = "DevicesPanel";
         private Device? _selectedDevice;
         private string? _selectedAccountUsername;
+        private string? _selectedPackageName;
         private string activeDeviceDetailTab = "DeviceOverview";
         private readonly List<SiticoneDashboardButtonAdvanced> _dynamicAccountButtons = new();
+        private readonly List<TableLayoutPanel> _dynamicPackageRows = new();
         private readonly string _conn = "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
 
         private readonly DeviceCacheService _cacheService;
@@ -116,6 +118,7 @@ namespace Opus
 
             _selectedDevice = device;
             _selectedAccountUsername = null;
+            _selectedPackageName = null;
             SubDashboard.Visible = true;
             DeviceDetailsOverlay.Visible = true;
             SubDashboard.BringToFront();
@@ -132,6 +135,7 @@ namespace Opus
 
             PopulateDeviceOverview(snapshot);
             BuildAccountTabs(snapshot);
+            BuildPackageStateTable(snapshot);
             if (!string.IsNullOrWhiteSpace(_selectedAccountUsername))
             {
                 PopulateAccountAnalytics(snapshot, _selectedAccountUsername);
@@ -146,13 +150,13 @@ namespace Opus
             DeviceOverview.IsSelected = true;
         }
 
-        private void ShowAccountTab(string username)
+        private void ShowAccountTab(string packageName)
         {
             activeDeviceDetailTab = "AccountDetails";
-            _selectedAccountUsername = username;
+            _selectedPackageName = packageName;
             DeviceOverviewContentPanel.Visible = false;
             AccountDetailsContentPanel.Visible = true;
-            PopulateAccountAnalytics(_cacheService.GetDeviceSnapshot(_selectedDevice!.DeviceId), username);
+            PopulateAccountAnalyticsForPackage(_cacheService.GetDeviceSnapshot(_selectedDevice!.DeviceId), packageName);
         }
 
         private void BuildAccountTabs(Opus.Cachers.DeviceState snapshot)
@@ -164,20 +168,38 @@ namespace Opus
             }
             _dynamicAccountButtons.Clear();
 
-            var accounts = snapshot.AccountsByUsername.Values
-                .OrderByDescending(a => a.LastEventUtc)
-                .ThenBy(a => a.Username, StringComparer.OrdinalIgnoreCase)
+            var packages = snapshot.AccountsByUsername.Values
+                 .GroupBy(a => CanonicalPackageName(a), StringComparer.OrdinalIgnoreCase)
+                 .Select(g =>
+                 {
+                     var latest = g
+                         .OrderByDescending(a => a.LastEventUtc)
+                         .ThenBy(a => a.Username, StringComparer.OrdinalIgnoreCase)
+                         .First();
+                     return new
+                     {
+                         Package = g.Key,
+                         LastEventUtc = latest.LastEventUtc,
+                         Active = g.Any(a => a.IsActive()),
+                         ButtonText = string.IsNullOrWhiteSpace(latest.Username)
+                             ? ShortPackageName(g.Key)
+                             : latest.Username
+                     };
+                 })
+                 .OrderByDescending(a => a.LastEventUtc)
+                .ThenBy(a => a.Package, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            foreach (var account in accounts)
+            
+            foreach (var pkg in packages)
             {
-                var btn = CreateAccountTabButton(account.Username, account.IsActive());
+                var btn = CreateAccountTabButton(ShortPackageName(pkg.ButtonText), pkg.Active);
                 sContainer.Controls.Add(btn);
                 _dynamicAccountButtons.Add(btn);
+                btn.Click += (_, __) => ShowAccountTab(pkg.Package);
             }
         }
 
-        private SiticoneDashboardButtonAdvanced CreateAccountTabButton(string username, bool active)
+        private SiticoneDashboardButtonAdvanced CreateAccountTabButton(string title, bool active)
         {
             var btn = new SiticoneDashboardButtonAdvanced
             {
@@ -206,10 +228,9 @@ namespace Opus
                 SelectedTextColor = PlaceholderAccount.SelectedTextColor,
                 Size = PlaceholderAccount.Size,
                 TextLeftPadding = PlaceholderAccount.TextLeftPadding,
-                Text = username
+                Text = title
             };
             btn.Image = Properties.Resources.plric;
-            btn.Click += (_, __) => ShowAccountTab(username);
             btn.IndicatorColor = active ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
             return btn;
         }
@@ -228,7 +249,7 @@ namespace Opus
                 .Max();
             RestartCountValue.Text = restartCount.ToString();
 
-            InfoValue1.Text = device.Name;
+            InfoValue1.Text = device.DeviceId;
             InfoValue2.Text = ToAgoText(device.LastSeenUtc);
             InfoValue3.Text = FormatUptime(device.UptimeSec);
             InfoValue4.Text = $"{device.BatteryPct}%";
@@ -242,6 +263,111 @@ namespace Opus
             InfoValue14.Text = device.DeviceId;
         }
 
+        private void BuildPackageStateTable(Opus.Cachers.DeviceState snapshot)
+        {
+            foreach (var row in _dynamicPackageRows)
+            {
+                PackageContainer.Controls.Remove(row);
+                row.Dispose();
+            }
+            _dynamicPackageRows.Clear();
+
+            var packages = snapshot.AccountsByUsername.Values
+                .GroupBy(a => CanonicalPackageName(a), StringComparer.OrdinalIgnoreCase)
+                .Select(g =>
+                {
+                    var latest = g.OrderByDescending(a => a.LastEventUtc).First();
+                    return new
+                    {
+                        Package = g.Key,
+                        LastSeen = latest.LastEventUtc,
+                        Active = g.Any(a => a.IsActive()),
+                        Reason = GetStringValue(latest.Values, "launch_reason", "reason", "source", "trigger", "manual")
+                    };
+                })
+                .OrderByDescending(x => x.LastSeen)
+                .ToList();
+
+            ActivePackagesSub1.Text = packages.Count > 0 ? $"Recent: {ShortPackageName(packages[0].Package)}" : "Recent: -";
+            PlaceholderPackage.Visible = packages.Count == 0;
+
+            foreach (var pkg in packages)
+            {
+                var row = CreatePackageRow(pkg.Package, pkg.Active, pkg.LastSeen, pkg.Reason);
+                PackageContainer.Controls.Add(row);
+                _dynamicPackageRows.Add(row);
+            }
+        }
+
+        private TableLayoutPanel CreatePackageRow(string packageName, bool active, DateTime lastSeenUtc, string reason)
+        {
+            var row = new TableLayoutPanel
+            {
+                BackColor = PlaceholderPackage.BackColor,
+                ColumnCount = PlaceholderPackage.ColumnCount,
+                Margin = PlaceholderPackage.Margin,
+                Size = PlaceholderPackage.Size
+            };
+            row.ColumnStyles.Clear();
+            foreach (ColumnStyle style in PlaceholderPackage.ColumnStyles)
+            {
+                row.ColumnStyles.Add(new ColumnStyle(style.SizeType, style.Width));
+            }
+            row.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            row.Controls.Add(ClonePackageLabel(Package1Name, ShortPackageName(packageName), Color.White), 0, 0);
+            row.Controls.Add(ClonePackageLabel(Package1State, active ? "Online" : "Offline", active ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128)), 1, 0);
+            row.Controls.Add(ClonePackageLabel(Package1Heartbeat, ToShortAgoText(lastSeenUtc), Color.White), 2, 0);
+            row.Controls.Add(ClonePackageLabel(Package1Reason, reason, Color.DarkGray), 3, 0);
+            return row;
+        }
+
+        private SiticoneLabel ClonePackageLabel(SiticoneLabel template, string text, Color? foreColor = null)
+            => new SiticoneLabel
+            {
+                BackColor = template.BackColor,
+                Dock = template.Dock,
+                Font = template.Font,
+                ForeColor = foreColor ?? template.ForeColor,
+                TextAlign = template.TextAlign,
+                Text = text
+            };
+
+        private static string CanonicalPackageName(Opus.Cachers.AccountState account)
+        {
+            if (!string.IsNullOrWhiteSpace(account.PackageName)) return account.PackageName.Trim();
+            return string.IsNullOrWhiteSpace(account.Username) ? "unknown" : account.Username.Trim();
+        }
+
+        private static string ShortPackageName(string packageName)
+        {
+            if (string.IsNullOrWhiteSpace(packageName)) return "unknown";
+            var idx = packageName.LastIndexOf('.');
+            return idx >= 0 && idx < packageName.Length - 1 ? packageName[(idx + 1)..] : packageName;
+        }
+
+        private static string GetStringValue(Dictionary<string, object?> values, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (!values.TryGetValue(key, out var value) || value == null) continue;
+                var text = value.ToString();
+                if (!string.IsNullOrWhiteSpace(text)) return text;
+            }
+            return "manual";
+        }
+
+        private void PopulateAccountAnalyticsForPackage(Opus.Cachers.DeviceState? device, string packageName)
+        {
+            if (device == null) return;
+            var latest = device.AccountsByUsername.Values
+                .Where(a => string.Equals(CanonicalPackageName(a), packageName, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(a => a.LastEventUtc)
+                .FirstOrDefault();
+            if (latest == null) return;
+            _selectedAccountUsername = latest.Username;
+            PopulateAccountAnalytics(device, latest.Username);
+        }
         private void PopulateAccountAnalytics(Opus.Cachers.DeviceState? device, string username)
         {
             if (device == null || !device.AccountsByUsername.TryGetValue(username, out var account)) return;
@@ -270,6 +396,7 @@ namespace Opus
                 maxHoney += 1;
                 minHoney -= 1;
             }
+
 
             HoneyChart.Series = new ISeries[]
             {
@@ -313,6 +440,15 @@ namespace Opus
             return $"{(int)span.TotalDays} day(s) ago";
         }
 
+        private static string ToShortAgoText(DateTime utc)
+        {
+            if (utc == DateTime.MinValue) return "-";
+            var span = DateTime.UtcNow - utc;
+            if (span.TotalSeconds < 60) return $"{Math.Max(1, (int)span.TotalSeconds)} sec";
+            if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} min";
+            if (span.TotalHours < 24) return $"{(int)span.TotalHours} hr";
+            return $"{(int)span.TotalDays} day";
+        }
         private static string FormatUptime(long uptimeSec)
         {
             if (uptimeSec <= 0) return "0m";
@@ -391,6 +527,7 @@ namespace Opus
             DashboardButton_Click(HomeButton, EventArgs.Empty);
             DeviceOverview.Click += (_, __) => ShowDeviceOverviewTab();
             PlaceholderAccount.Visible = false;
+            PlaceholderPackage.Visible = false;
             GradientToggler(HomeButton, EventArgs.Empty);
             PositionStatsCards();
             //Device newDevice2 = new Device("linging phone", 0, 5, "2 hours ago", Color.FromArgb(255, 128, 128));
