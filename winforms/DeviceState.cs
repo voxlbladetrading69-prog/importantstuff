@@ -49,8 +49,15 @@ namespace Opus.Cachers
         // Flexible payload fields (honey, hive_size, etc.)
         public Dictionary<string, object?> Values { get; set; }
             = new(StringComparer.OrdinalIgnoreCase);
-
+        // Timeline cache for charting.
+        public List<AccountMetricPoint> MetricTimeline { get; set; } = new();
         public bool IsActive(int minutes = 10)
             => LastEventUtc >= DateTime.UtcNow.AddMinutes(-minutes);
+    }
+    public class AccountMetricPoint
+    {
+        public DateTime EventTimeUtc { get; set; }
+        public decimal Honey { get; set; }
+        public decimal HiveSize { get; set; }
     }
 }
