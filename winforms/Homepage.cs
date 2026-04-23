@@ -383,13 +383,25 @@ namespace Opus
             AccountDetailsStatus.ForeColor = active ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
 
             var points = account.MetricTimeline.OrderBy(p => p.EventTimeUtc).TakeLast(60).ToList();
-            if (points.Count == 0)
+            var eventCount = points.Count;
+            if (eventCount == 0)
             {
                 points.Add(new Opus.Cachers.AccountMetricPoint { EventTimeUtc = DateTime.UtcNow, Honey = 0m, HiveSize = 0m });
+            }
+            else if (eventCount == 1)
+            {
+                var only = points[0];
+                points = new List<Opus.Cachers.AccountMetricPoint>
+                {
+                    new Opus.Cachers.AccountMetricPoint { EventTimeUtc = only.EventTimeUtc.AddSeconds(-30), Honey = only.Honey, HiveSize = only.HiveSize },
+                    only,
+                    new Opus.Cachers.AccountMetricPoint { EventTimeUtc = only.EventTimeUtc.AddSeconds(30), Honey = only.Honey, HiveSize = only.HiveSize }
+                };
             }
 
             var honey = points.Select(p => (double)p.Honey).ToList();
             var hive = points.Select(p => (double)p.HiveSize).ToList();
+            var xAxisLabels = BuildTimelineLabels(points.Select(p => p.EventTimeUtc).ToList(), eventCount);
 
             CurrentHoneyValue.Text = $"{honey.LastOrDefault():0}";
             CurrentHiveValue.Text = $"{hive.LastOrDefault():0}";
@@ -415,7 +427,17 @@ namespace Opus
                 }
             };
             HoneyChart.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = minHoney-range*0.1, MaxLimit = maxHoney+range*0.1 } };
-            HoneyChart.XAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { IsVisible = false } };
+            HoneyChart.XAxes = new LiveChartsCore.SkiaSharpView.Axis[]
+            {
+                new LiveChartsCore.SkiaSharpView.Axis
+                {
+                    Labels = xAxisLabels,
+                    LabelsRotation = 0,
+                    TextSize = 10,
+                    MinStep = 1,
+                    ForceStepToMin = true
+                }
+            }; 
             cartesianChart1.Series = new ISeries[]
             {
                 new LineSeries<double>
@@ -427,8 +449,19 @@ namespace Opus
                 }
             };
             cartesianChart1.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = 0, MaxLimit = 50 } };
-            cartesianChart1.XAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { IsVisible = false } };
+            cartesianChart1.XAxes = new LiveChartsCore.SkiaSharpView.Axis[]
+            {
+                new LiveChartsCore.SkiaSharpView.Axis
+                {
+                    Labels = xAxisLabels,
+                    LabelsRotation = 0,
+                    TextSize = 10,
+                    MinStep = 1,
+                    ForceStepToMin = true
+                }
+            };
         }
+
         private static (double minLimit, double maxLimit) GetExpandedAxisLimits(double min, double max)
         {
             var minLimit = min < 0 ? min * 1.10 : min * 0.90;
@@ -441,6 +474,20 @@ namespace Opus
             }
 
             return (minLimit, maxLimit);
+        }
+
+        private static string[] BuildTimelineLabels(List<DateTime> timestampsUtc, int originalEventCount)
+        {
+            if (timestampsUtc.Count == 0) return Array.Empty<string>();
+            if (originalEventCount == 1 && timestampsUtc.Count >= 3)
+            {
+                return new[] { "", timestampsUtc[1].ToLocalTime().ToString("HH:mm:ss"), "" };
+            }
+
+            var labels = Enumerable.Repeat("", timestampsUtc.Count).ToArray();
+            labels[0] = timestampsUtc[0].ToLocalTime().ToString("HH:mm:ss");
+            labels[^1] = timestampsUtc[^1].ToLocalTime().ToString("HH:mm:ss");
+            return labels;
         }
         private static int TryGetInt(Dictionary<string, object?> values, string key)
         {
