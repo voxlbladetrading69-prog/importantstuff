@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Drawing;
@@ -19,10 +20,16 @@ namespace Opus
         private Device? _selectedDevice;
         private string activeDeviceDetailTab = "DeviceOverview";
         private readonly string _conn = "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
+        private readonly DeviceCacheService _cacheService;
+        private readonly System.Windows.Forms.Timer _refreshTimer;
+        private readonly SemaphoreSlim _refreshGate = new(1, 1);
         //
         public Homepage()
         {
             InitializeComponent();
+            _cacheService = new DeviceCacheService(_conn);
+            _refreshTimer = new System.Windows.Forms.Timer { Interval = 15_000 };
+            _refreshTimer.Tick += async (_, __) => await RefreshFromCacheAsync();
             Device.BindStatsLabels( // set to the text labels 
                 TotalText,
                 ActiveText,
@@ -33,27 +40,15 @@ namespace Opus
                 ActiveDevicesLastDay         // "+0 in the last 24 Hours"
             );
             this.Load += InitiateDbConnection;
+            this.FormClosing += (_, __) => _refreshTimer.Stop();
         }
         private async void InitiateDbConnection(object? sender, EventArgs e)
         {
             try
             {
-                DevicesFlowLayoutPanel.Controls.Clear();
-
-                var loader = new DeviceDbLoader(_conn);
-                var devices = await loader.LoadDevicesForDashboardAsync();
-
-                foreach (var d in devices)
-                {
-                    d.DeviceButton.Cursor = Cursors.Hand;
-                    //d.DeviceButton.Click += (_, __) => OpenDeviceDetails(d);
-
-                    foreach (Control child in d.DeviceButton.Controls)
-                        //child.Click += (_, __) => OpenDeviceDetails(d);
-
-                    DevicesFlowLayoutPanel.Controls.Add(d.DeviceButton);
-                }
-                MessageBox.Show("LOADED!");
+                await _cacheService.InitializeAsync();
+                RenderDevicesFromCache();
+                _refreshTimer.Start();
             }
             catch (Exception ex)
             {
@@ -65,6 +60,44 @@ namespace Opus
             //    DevicesFlowLayoutPanel.Controls.Add(newDevice.DeviceButton);
             //}
         }
+
+        private async Task RefreshFromCacheAsync()
+        {
+            if (!await _refreshGate.WaitAsync(0)) return;
+            try
+            {
+                var changedRows = await _cacheService.RefreshAsync();
+                if (changedRows > 0)
+                {
+                    RenderDevicesFromCache();
+                }
+            }
+            catch
+            {
+                // Keep UI responsive if a refresh cycle fails.
+            }
+            finally
+            {
+                _refreshGate.Release();
+            }
+        }
+
+        private void RenderDevicesFromCache()
+        {
+            var devices = _cacheService.BuildDashboardDevices();
+            Device.ResetStats();
+            DevicesFlowLayoutPanel.SuspendLayout();
+            DevicesFlowLayoutPanel.Controls.Clear();
+
+            foreach (var d in devices)
+            {
+                d.DeviceButton.Cursor = Cursors.Hand;
+                DevicesFlowLayoutPanel.Controls.Add(d.DeviceButton);
+            }
+
+            DevicesFlowLayoutPanel.ResumeLayout();
+        }
+
         private void PositionStatsCards()
         {
             Control parent = DevicesPanel;
@@ -283,6 +316,12 @@ namespace Opus
             int active24h = _devices.Count(d => d.LastSyncUtc >= DateTime.UtcNow.AddHours(-24));
             if (_panelLast24hDeltaLabel != null)
                 _panelLast24hDeltaLabel.Text = $"+{active24h} active in the last 24 hours";
+        }
+
+        public static void ResetStats()
+        {
+            _devices.Clear();
+            UpdateStats();
         }
 
         public void SetDeviceName(string newName)
@@ -594,5 +633,3 @@ namespace Opus
         }
     }
 }
-
-
