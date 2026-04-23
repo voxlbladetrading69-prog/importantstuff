@@ -125,6 +125,7 @@ namespace Opus
             DeviceDetailsOverlay.BringToFront();
             RefreshSelectedDeviceAnalytics();
             ShowDeviceOverviewTab();
+            SubDashboardGradientToggler(DeviceOverview, EventArgs.Empty);
         }
 
         private void RefreshSelectedDeviceAnalytics()
@@ -145,9 +146,9 @@ namespace Opus
         private void ShowDeviceOverviewTab()
         {
             activeDeviceDetailTab = "DeviceOverview";
+            _selectedPackageName = null;
             DeviceOverviewContentPanel.Visible = true;
             AccountDetailsContentPanel.Visible = false;
-            DeviceOverview.IsSelected = true;
         }
 
         private void ShowAccountTab(string packageName)
@@ -195,7 +196,11 @@ namespace Opus
                 var btn = CreateAccountTabButton(ShortPackageName(pkg.ButtonText), pkg.Active);
                 sContainer.Controls.Add(btn);
                 _dynamicAccountButtons.Add(btn);
-                btn.Click += (_, __) => ShowAccountTab(pkg.Package);
+                btn.Click += (_, __) =>
+                {
+                    ShowAccountTab(pkg.Package);
+                    SubDashboardGradientToggler(btn, EventArgs.Empty);
+                };
             }
         }
 
@@ -391,7 +396,8 @@ namespace Opus
 
             var minHoney = honey.Min();
             var maxHoney = honey.Max();
-            if (Math.Abs(maxHoney - minHoney) < 0.1)
+            var range = maxHoney - minHoney;
+            if (Math.Abs(range) < 0.1)
             {
                 maxHoney += 1;
                 minHoney -= 1;
@@ -408,7 +414,7 @@ namespace Opus
                     Stroke = new SolidColorPaint(SKColors.Gold, 2)
                 }
             };
-            HoneyChart.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = minHoney, MaxLimit = maxHoney } };
+            HoneyChart.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = minHoney-range*0.1, MaxLimit = maxHoney+range*0.1 } };
             HoneyChart.XAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { IsVisible = false } };
             cartesianChart1.Series = new ISeries[]
             {
@@ -423,7 +429,19 @@ namespace Opus
             cartesianChart1.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = 0, MaxLimit = 50 } };
             cartesianChart1.XAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { IsVisible = false } };
         }
+        private static (double minLimit, double maxLimit) GetExpandedAxisLimits(double min, double max)
+        {
+            var minLimit = min < 0 ? min * 1.10 : min * 0.90;
+            var maxLimit = max < 0 ? max * 0.90 : max * 1.10;
 
+            if (Math.Abs(maxLimit - minLimit) < 0.1)
+            {
+                maxLimit += 1;
+                minLimit -= 1;
+            }
+
+            return (minLimit, maxLimit);
+        }
         private static int TryGetInt(Dictionary<string, object?> values, string key)
         {
             if (!values.TryGetValue(key, out var value) || value == null) return 0;
@@ -493,10 +511,21 @@ namespace Opus
 
         private void GradientToggler(object sender, EventArgs e) //turn on EnableGradient for this button and turn it off for the others, also set IsSelected to true for this button and false for the others
         {
-            SiticoneNetCoreUI.SiticoneDashboardButtonAdvanced btn = sender as SiticoneNetCoreUI.SiticoneDashboardButtonAdvanced;
-            foreach (Control control in Container.Controls)
+            GradientTogglerForContainer(sender, Container);
+        }
+
+        private void SubDashboardGradientToggler(object sender, EventArgs e)
+        {
+            GradientTogglerForContainer(sender, sContainer);
+        }
+
+        private static void GradientTogglerForContainer(object sender, Control container)
+        {
+            if (sender is not SiticoneDashboardButtonAdvanced btn) return;
+
+            foreach (Control control in container.Controls)
             {
-                if (control is SiticoneNetCoreUI.SiticoneDashboardButtonAdvanced child)
+                if (control is SiticoneDashboardButtonAdvanced child)
                 {
                     child.EnableGradient = false;
                     child.IsSelected = false;
@@ -525,13 +554,27 @@ namespace Opus
                 }
             }
             DashboardButton_Click(HomeButton, EventArgs.Empty);
-            DeviceOverview.Click += (_, __) => ShowDeviceOverviewTab();
+            DeviceOverview.Click += (_, __) =>
+            {
+                ShowDeviceOverviewTab();
+                SubDashboardGradientToggler(DeviceOverview, EventArgs.Empty);
+            };
             PlaceholderAccount.Visible = false;
             PlaceholderPackage.Visible = false;
             GradientToggler(HomeButton, EventArgs.Empty);
+            BackToDevicesButton.Click += BackToDevicesButton_Click;
             PositionStatsCards();
             //Device newDevice2 = new Device("linging phone", 0, 5, "2 hours ago", Color.FromArgb(255, 128, 128));
             //DevicesFlowLayoutPanel.Controls.Add(newDevice2.DeviceButton);
+        }
+        private void BackToDevicesButton_Click(object? sender, EventArgs e)
+        {
+            _selectedAccountUsername = null;
+            _selectedPackageName = null;
+            ShowDeviceOverviewTab();
+            SubDashboardGradientToggler(DeviceOverview, EventArgs.Empty);
+            DeviceDetailsOverlay.Visible = false;
+            SubDashboard.Visible = false;
         }
 
         private void DevicesFlowLayoutPanel_Resize(object sender, EventArgs e)
