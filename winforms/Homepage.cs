@@ -10,6 +10,11 @@ using System.Text;
 using System.Windows.Forms;
 using Npgsql;
 using Supabase;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.WinForms;
+using LiveChartsCore.Measure;
+using SkiaSharp;
 namespace Opus
 {
     public partial class Homepage : Form
@@ -77,18 +82,27 @@ namespace Opus
 
         private void RenderDevicesFromCache()
         {
-            var devices = _cacheService.BuildDashboardDevices();
             Device.ResetStats();
-            DevicesFlowLayoutPanel.SuspendLayout();
+            var devices = _cacheService.BuildDashboardDevices();
             DevicesFlowLayoutPanel.Controls.Clear();
 
             foreach (var d in devices)
             {
+                d.CardClicked += Device_CardClicked;
                 d.DeviceButton.Cursor = Cursors.Hand;
                 DevicesFlowLayoutPanel.Controls.Add(d.DeviceButton);
             }
+            Device.UpdateStats();
+        }
+        private void Device_CardClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Device device) return;
 
-            DevicesFlowLayoutPanel.ResumeLayout();
+            _selectedDevice = device;
+            SubDashboard.Visible = true;
+            DeviceDetailsOverlay.Visible = true;
+            SubDashboard.BringToFront();
+            DeviceDetailsOverlay.BringToFront();
         }
         private void PositionStatsCards()
         {
@@ -214,6 +228,8 @@ namespace Opus
         private static SiticoneLabel _panelTotalDevicesLabel;    
         private static SiticoneLabel _panelLast24hDeltaLabel;
 
+        public event EventHandler? CardClicked;
+
         private bool _isCardHovered = false;
 
         public Device(
@@ -290,8 +306,20 @@ namespace Opus
                 HookHoverRecursive(c);
             }
         }
+        private void HookCardClickRecursive(Control root)
+        {
+            if (root.Name != "QRebootButton" && root.Name != "Options")
+            {
+                root.Click += (_, __) => CardClicked?.Invoke(this, EventArgs.Empty);
+            }
 
-        private static void UpdateStats()
+            foreach (Control c in root.Controls)
+            {
+                if (c.Name == "QRebootButton" || c.Name == "Options") continue;
+                HookCardClickRecursive(c);
+            }
+        }
+        public static void UpdateStats()
         {
             if (_totalDevicesLabel != null)
                 _totalDevicesLabel.Text = _devices.Count.ToString();
@@ -619,6 +647,7 @@ namespace Opus
             DeviceButton.Controls.Add(OptionsButton);
 
             HookHoverRecursive(DeviceButton);
+            HookCardClickRecursive(DeviceButton);
             SetCardHover(false);
             highlighter.SendToBack();
         }
