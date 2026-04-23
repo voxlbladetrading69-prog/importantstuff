@@ -1,20 +1,21 @@
+using LiveChartsCore;
+using LiveChartsCore.Measure;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using LiveChartsCore.SkiaSharpView.WinForms;
+using Npgsql;
 using SiticoneNetCoreUI;
+using SkiaSharp;
+using Supabase;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
-using System.Threading.Tasks;
-using System.Linq;
 using System.Drawing;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using Npgsql;
-using Supabase;
-using LiveChartsCore;
-using LiveChartsCore.SkiaSharpView;
-using LiveChartsCore.SkiaSharpView.WinForms;
-using LiveChartsCore.Measure;
-using SkiaSharp;
 namespace Opus
 {
     public partial class Homepage : Form
@@ -22,7 +23,9 @@ namespace Opus
         // state variables
         string activePanel = "DevicesPanel";
         private Device? _selectedDevice;
+        private string? _selectedAccountUsername;
         private string activeDeviceDetailTab = "DeviceOverview";
+        private readonly List<SiticoneDashboardButtonAdvanced> _dynamicAccountButtons = new();
         private readonly string _conn = "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
 
         private readonly DeviceCacheService _cacheService;
@@ -39,6 +42,9 @@ namespace Opus
                 ActiveText,
                 InactiveText
             );
+            TotalLabel.Text = "Total Accounts";
+            ActiveLabel.Text = "Active Accounts";
+            InactiveLabel.Text = "Inactive Accounts";
             Device.BindOverviewPanelLabels(
                 ActiveDevicesText,      // the big "1"
                 ActiveDevicesLastDay         // "+0 in the last 24 Hours"
@@ -93,16 +99,225 @@ namespace Opus
                 DevicesFlowLayoutPanel.Controls.Add(d.DeviceButton);
             }
             Device.UpdateStats();
+
+            if (_selectedDevice != null)
+            {
+                var refreshed = devices.FirstOrDefault(d => d.DeviceId == _selectedDevice.DeviceId);
+                if (refreshed != null)
+                {
+                    _selectedDevice = refreshed;
+                    RefreshSelectedDeviceAnalytics();
+                }
+            }
         }
         private void Device_CardClicked(object? sender, EventArgs e)
         {
             if (sender is not Device device) return;
 
             _selectedDevice = device;
+            _selectedAccountUsername = null;
             SubDashboard.Visible = true;
             DeviceDetailsOverlay.Visible = true;
             SubDashboard.BringToFront();
             DeviceDetailsOverlay.BringToFront();
+            RefreshSelectedDeviceAnalytics();
+            ShowDeviceOverviewTab();
+        }
+
+        private void RefreshSelectedDeviceAnalytics()
+        {
+            if (_selectedDevice == null) return;
+            var snapshot = _cacheService.GetDeviceSnapshot(_selectedDevice.DeviceId);
+            if (snapshot == null) return;
+
+            PopulateDeviceOverview(snapshot);
+            BuildAccountTabs(snapshot);
+            if (!string.IsNullOrWhiteSpace(_selectedAccountUsername))
+            {
+                PopulateAccountAnalytics(snapshot, _selectedAccountUsername);
+            }
+        }
+
+        private void ShowDeviceOverviewTab()
+        {
+            activeDeviceDetailTab = "DeviceOverview";
+            DeviceOverviewContentPanel.Visible = true;
+            AccountDetailsContentPanel.Visible = false;
+            DeviceOverview.IsSelected = true;
+        }
+
+        private void ShowAccountTab(string username)
+        {
+            activeDeviceDetailTab = "AccountDetails";
+            _selectedAccountUsername = username;
+            DeviceOverviewContentPanel.Visible = false;
+            AccountDetailsContentPanel.Visible = true;
+            PopulateAccountAnalytics(_cacheService.GetDeviceSnapshot(_selectedDevice!.DeviceId), username);
+        }
+
+        private void BuildAccountTabs(Opus.Cachers.DeviceState snapshot)
+        {
+            foreach (var btn in _dynamicAccountButtons)
+            {
+                sContainer.Controls.Remove(btn);
+                btn.Dispose();
+            }
+            _dynamicAccountButtons.Clear();
+
+            var accounts = snapshot.AccountsByUsername.Values
+                .OrderByDescending(a => a.LastEventUtc)
+                .ThenBy(a => a.Username, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var account in accounts)
+            {
+                var btn = CreateAccountTabButton(account.Username, account.IsActive());
+                sContainer.Controls.Add(btn);
+                _dynamicAccountButtons.Add(btn);
+            }
+        }
+
+        private SiticoneDashboardButtonAdvanced CreateAccountTabButton(string username, bool active)
+        {
+            var btn = new SiticoneDashboardButtonAdvanced
+            {
+                BackColor = PlaceholderAccount.BackColor,
+                BorderColor = PlaceholderAccount.BorderColor,
+                Font = PlaceholderAccount.Font,
+                ForeColor = PlaceholderAccount.ForeColor,
+                GradientAngle = PlaceholderAccount.GradientAngle,
+                GradientColor1 = PlaceholderAccount.GradientColor1,
+                GradientColor2 = PlaceholderAccount.GradientColor2,
+                GroupName = PlaceholderAccount.GroupName,
+                HoverAnimationDurationMs = PlaceholderAccount.HoverAnimationDurationMs,
+                HoverBorderColor = PlaceholderAccount.HoverBorderColor,
+                HoverColor = PlaceholderAccount.HoverColor,
+                HoverTextColor = PlaceholderAccount.HoverTextColor,
+                IndicatorColor = PlaceholderAccount.IndicatorColor,
+                IndicatorSide = PlaceholderAccount.IndicatorSide,
+                IndicatorWidth = PlaceholderAccount.IndicatorWidth,
+                Margin = PlaceholderAccount.Margin,
+                PressedColor = PlaceholderAccount.PressedColor,
+                ReadOnlyColor = PlaceholderAccount.ReadOnlyColor,
+                ReadOnlyTextColor = PlaceholderAccount.ReadOnlyTextColor,
+                RippleColor = PlaceholderAccount.RippleColor,
+                SelectedBackColor = PlaceholderAccount.SelectedBackColor,
+                SelectedBorderColor = PlaceholderAccount.SelectedBorderColor,
+                SelectedTextColor = PlaceholderAccount.SelectedTextColor,
+                Size = PlaceholderAccount.Size,
+                TextLeftPadding = PlaceholderAccount.TextLeftPadding,
+                Text = username
+            };
+            btn.Image = Properties.Resources.plric;
+            btn.Click += (_, __) => ShowAccountTab(username);
+            btn.IndicatorColor = active ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
+            return btn;
+        }
+
+        private void PopulateDeviceOverview(Opus.Cachers.DeviceState device)
+        {
+            OverviewSubtitleLabel.Text = $"{device.Name}   {(device.IsOnline() ? "● Online" : "● Offline")}";
+            OverviewSubtitleLabel.ForeColor = device.IsOnline() ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
+            OnlineStatusValue.Text = device.IsOnline() ? "ONLINE" : "OFFLINE";
+            OnlineStatusValue.ForeColor = device.IsOnline() ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
+            ActivePackagesValue.Text = $"{device.ActiveAccounts} / {Math.Max(device.MaxAccounts, 1)}";
+
+            var restartCount = device.AccountsByUsername.Values
+                .Select(a => TryGetInt(a.Values, "restart_count"))
+                .DefaultIfEmpty(0)
+                .Max();
+            RestartCountValue.Text = restartCount.ToString();
+
+            InfoValue1.Text = device.Name;
+            InfoValue2.Text = ToAgoText(device.LastSeenUtc);
+            InfoValue3.Text = FormatUptime(device.UptimeSec);
+            InfoValue4.Text = $"{device.BatteryPct}%";
+            InfoValue5.Text = device.Charging;
+            InfoValue6.Text = device.Network;
+            InfoValue7.Text = $"{device.PingMs} ms";
+            InfoValue10.Text = $"{device.RamUsedMb} MB";
+            InfoValue11.Text = $"{device.RamFreeMb} MB";
+            InfoValue12.Text = $"{device.StorageFreeMb} MB";
+            InfoValue13.Text = $"{device.BatteryTempC:0.#} C";
+            InfoValue14.Text = device.DeviceId;
+        }
+
+        private void PopulateAccountAnalytics(Opus.Cachers.DeviceState? device, string username)
+        {
+            if (device == null || !device.AccountsByUsername.TryGetValue(username, out var account)) return;
+
+            AccountDetailsTitle.Text = username;
+            var active = account.IsActive();
+            AccountDetailsStatus.Text = active ? "● Active" : "● Inactive";
+            AccountDetailsStatus.ForeColor = active ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
+
+            var points = account.MetricTimeline.OrderBy(p => p.EventTimeUtc).TakeLast(60).ToList();
+            if (points.Count == 0)
+            {
+                points.Add(new Opus.Cachers.AccountMetricPoint { EventTimeUtc = DateTime.UtcNow, Honey = 0m, HiveSize = 0m });
+            }
+
+            var honey = points.Select(p => (double)p.Honey).ToList();
+            var hive = points.Select(p => (double)p.HiveSize).ToList();
+
+            CurrentHoneyValue.Text = $"{honey.LastOrDefault():0}";
+            CurrentHiveValue.Text = $"{hive.LastOrDefault():0}";
+
+            var minHoney = honey.Min();
+            var maxHoney = honey.Max();
+            if (Math.Abs(maxHoney - minHoney) < 0.1)
+            {
+                maxHoney += 1;
+                minHoney -= 1;
+            }
+
+            HoneyChart.Series = new ISeries[]
+            {
+                new LineSeries<double>
+                {
+                    Values = honey,
+                    GeometrySize = 0,
+                    Fill = null,
+                    Stroke = new SolidColorPaint(SKColors.Gold, 2)
+                }
+            };
+            HoneyChart.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = minHoney, MaxLimit = maxHoney } };
+            HoneyChart.XAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { IsVisible = false } };
+            cartesianChart1.Series = new ISeries[]
+            {
+                new LineSeries<double>
+                {
+                    Values = hive,
+                    GeometrySize = 0,
+                    Fill = null,
+                    Stroke = new SolidColorPaint(SKColors.DeepSkyBlue, 2)
+                }
+            };
+            cartesianChart1.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = 0, MaxLimit = 50 } };
+            cartesianChart1.XAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { IsVisible = false } };
+        }
+
+        private static int TryGetInt(Dictionary<string, object?> values, string key)
+        {
+            if (!values.TryGetValue(key, out var value) || value == null) return 0;
+            return int.TryParse(value.ToString(), out var parsed) ? parsed : 0;
+        }
+
+        private static string ToAgoText(DateTime utc)
+        {
+            if (utc == DateTime.MinValue) return "Never";
+            var span = DateTime.UtcNow - utc;
+            if (span.TotalSeconds < 60) return "Just now";
+            if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} min ago";
+            if (span.TotalHours < 24) return $"{(int)span.TotalHours} hr ago";
+            return $"{(int)span.TotalDays} day(s) ago";
+        }
+
+        private static string FormatUptime(long uptimeSec)
+        {
+            if (uptimeSec <= 0) return "0m";
+            var ts = TimeSpan.FromSeconds(uptimeSec);
+            return $"{(int)ts.TotalDays}d {ts.Hours}h {ts.Minutes}m";
         }
         private void PositionStatsCards()
         {
@@ -174,6 +389,8 @@ namespace Opus
                 }
             }
             DashboardButton_Click(HomeButton, EventArgs.Empty);
+            DeviceOverview.Click += (_, __) => ShowDeviceOverviewTab();
+            PlaceholderAccount.Visible = false;
             GradientToggler(HomeButton, EventArgs.Empty);
             PositionStatsCards();
             //Device newDevice2 = new Device("linging phone", 0, 5, "2 hours ago", Color.FromArgb(255, 128, 128));
@@ -322,7 +539,7 @@ namespace Opus
         public static void UpdateStats()
         {
             if (_totalDevicesLabel != null)
-                _totalDevicesLabel.Text = _devices.Count.ToString();
+                _totalDevicesLabel.Text = _devices.Sum(d => d.MaxAccounts).ToString();
 
             if (_activeAccountsLabel != null)
                 _activeAccountsLabel.Text = _devices.Sum(d => d.ActiveAccounts).ToString();
