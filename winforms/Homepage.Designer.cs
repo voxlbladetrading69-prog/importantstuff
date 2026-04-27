@@ -155,9 +155,13 @@ namespace Opus
             CurrentHiveTitle = new SiticoneNetCoreUI.SiticoneLabel();
             CurrentHiveValue = new SiticoneNetCoreUI.SiticoneLabel();
             HoneyGraphPanel = new SiticoneNetCoreUI.SiticoneAdvancedPanel();
+            AnalyticsRange24HButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
+            AnalyticsRange7DButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
+            AnalyticsRange30DButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
             HoneyGraphTitle = new SiticoneNetCoreUI.SiticoneLabel();
             HoneyChart = new LiveChartsCore.SkiaSharpView.WinForms.CartesianChart();
             HiveSizePanel = new SiticoneNetCoreUI.SiticoneAdvancedPanel();
+            cartesianChart1 = new LiveChartsCore.SkiaSharpView.WinForms.CartesianChart();
             HiveSizeTitle = new SiticoneNetCoreUI.SiticoneLabel();
             DevicesFlowLayoutPanel = new FlowLayoutPanel();
             DevicePlaceholder = new SiticoneNetCoreUI.SiticoneAdvancedPanel();
@@ -194,7 +198,6 @@ namespace Opus
             siticoneTextBoxAdvanced1 = new SiticoneNetCoreUI.SiticoneTextBoxAdvanced();
             BackToDevicesButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
             DeviceDetailsTitle = new SiticoneNetCoreUI.SiticoneLabel();
-            DeviceDetailsStatus = new SiticoneNetCoreUI.SiticoneLabel();
             SettingsPanel = new SiticoneNetCoreUI.SiticoneAdvancedPanel();
             DangerZoneCard = new SiticoneNetCoreUI.SiticoneAdvancedPanel();
             ResetButton = new SiticoneNetCoreUI.SiticoneButtonAdvanced();
@@ -224,7 +227,6 @@ namespace Opus
             sContainer = new FlowLayoutPanel();
             DeviceOverview = new SiticoneNetCoreUI.SiticoneDashboardButtonAdvanced();
             PlaceholderAccount = new SiticoneNetCoreUI.SiticoneDashboardButtonAdvanced();
-            cartesianChart1 = new LiveChartsCore.SkiaSharpView.WinForms.CartesianChart();
             OnlineStatusCard.SuspendLayout();
             ActivePackagesCard.SuspendLayout();
             RestartCountCard.SuspendLayout();
@@ -2854,6 +2856,9 @@ namespace Opus
             HoneyGraphPanel.BottomRightRadius = 8;
             HoneyGraphPanel.ContentAlignmentCustom = ContentAlignment.MiddleCenter;
             HoneyGraphPanel.Controls.Add(HoneyGraphTitle);
+            HoneyGraphPanel.Controls.Add(AnalyticsRange30DButton);
+            HoneyGraphPanel.Controls.Add(AnalyticsRange7DButton);
+            HoneyGraphPanel.Controls.Add(AnalyticsRange24HButton);
             HoneyGraphPanel.Controls.Add(HoneyChart);
             HoneyGraphPanel.CornerPadding = new Padding(5);
             HoneyGraphPanel.DisabledBackColor = Color.Empty;
@@ -2898,6 +2903,78 @@ namespace Opus
             HoneyGraphPanel.TopLeftRadius = 8;
             HoneyGraphPanel.TopRightRadius = 8;
             // 
+            // AnalyticsRange24HButton
+            // 
+            AnalyticsRange24HButton.BackColor = Color.Transparent;
+            AnalyticsRange24HButton.DisabledTextColor = Color.FromArgb(120, 120, 120);
+            AnalyticsRange24HButton.EnablePressAnimation = false;
+            AnalyticsRange24HButton.EnableRippleEffect = false;
+            AnalyticsRange24HButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            AnalyticsRange24HButton.HoverAnimationSpeed = 5F;
+            AnalyticsRange24HButton.HoverShowUnderline = false;
+            AnalyticsRange24HButton.HoverTextColor = Color.White;
+            AnalyticsRange24HButton.IconSize = new Size(16, 16);
+            AnalyticsRange24HButton.Location = new Point(392, 12);
+            AnalyticsRange24HButton.Margin = new Padding(0);
+            AnalyticsRange24HButton.Name = "AnalyticsRange24HButton";
+            AnalyticsRange24HButton.PressedTextColor = Color.White;
+            AnalyticsRange24HButton.RippleColor = Color.FromArgb(100, 0, 123, 255);
+            AnalyticsRange24HButton.Size = new Size(48, 24);
+            AnalyticsRange24HButton.TabIndex = 2;
+            AnalyticsRange24HButton.Text = "24H";
+            AnalyticsRange24HButton.TextColor = Color.White;
+            AnalyticsRange24HButton.TextGradientColor1 = Color.FromArgb(34, 153, 186);
+            AnalyticsRange24HButton.TextGradientColor2 = Color.FromArgb(20, 108, 148);
+            AnalyticsRange24HButton.UnderlineColor = Color.FromArgb(34, 153, 186);
+            // 
+            // AnalyticsRange7DButton
+            // 
+            AnalyticsRange7DButton.BackColor = Color.Transparent;
+            AnalyticsRange7DButton.DisabledTextColor = Color.FromArgb(120, 120, 120);
+            AnalyticsRange7DButton.EnablePressAnimation = false;
+            AnalyticsRange7DButton.EnableRippleEffect = false;
+            AnalyticsRange7DButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            AnalyticsRange7DButton.HoverAnimationSpeed = 5F;
+            AnalyticsRange7DButton.HoverShowUnderline = false;
+            AnalyticsRange7DButton.HoverTextColor = Color.White;
+            AnalyticsRange7DButton.IconSize = new Size(16, 16);
+            AnalyticsRange7DButton.Location = new Point(448, 12);
+            AnalyticsRange7DButton.Margin = new Padding(0);
+            AnalyticsRange7DButton.Name = "AnalyticsRange7DButton";
+            AnalyticsRange7DButton.PressedTextColor = Color.White;
+            AnalyticsRange7DButton.RippleColor = Color.FromArgb(100, 0, 123, 255);
+            AnalyticsRange7DButton.Size = new Size(40, 24);
+            AnalyticsRange7DButton.TabIndex = 3;
+            AnalyticsRange7DButton.Text = "7D";
+            AnalyticsRange7DButton.TextColor = Color.DarkGray;
+            AnalyticsRange7DButton.TextGradientColor1 = Color.FromArgb(34, 153, 186);
+            AnalyticsRange7DButton.TextGradientColor2 = Color.FromArgb(20, 108, 148);
+            AnalyticsRange7DButton.UnderlineColor = Color.FromArgb(34, 153, 186);
+            // 
+            // AnalyticsRange30DButton
+            // 
+            AnalyticsRange30DButton.BackColor = Color.Transparent;
+            AnalyticsRange30DButton.DisabledTextColor = Color.FromArgb(120, 120, 120);
+            AnalyticsRange30DButton.EnablePressAnimation = false;
+            AnalyticsRange30DButton.EnableRippleEffect = false;
+            AnalyticsRange30DButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            AnalyticsRange30DButton.HoverAnimationSpeed = 5F;
+            AnalyticsRange30DButton.HoverShowUnderline = false;
+            AnalyticsRange30DButton.HoverTextColor = Color.White;
+            AnalyticsRange30DButton.IconSize = new Size(16, 16);
+            AnalyticsRange30DButton.Location = new Point(496, 12);
+            AnalyticsRange30DButton.Margin = new Padding(0);
+            AnalyticsRange30DButton.Name = "AnalyticsRange30DButton";
+            AnalyticsRange30DButton.PressedTextColor = Color.White;
+            AnalyticsRange30DButton.RippleColor = Color.FromArgb(100, 0, 123, 255);
+            AnalyticsRange30DButton.Size = new Size(45, 24);
+            AnalyticsRange30DButton.TabIndex = 4;
+            AnalyticsRange30DButton.Text = "30D";
+            AnalyticsRange30DButton.TextColor = Color.DarkGray;
+            AnalyticsRange30DButton.TextGradientColor1 = Color.FromArgb(34, 153, 186);
+            AnalyticsRange30DButton.TextGradientColor2 = Color.FromArgb(20, 108, 148);
+            AnalyticsRange30DButton.UnderlineColor = Color.FromArgb(34, 153, 186);
+            // 
             // HoneyGraphTitle
             // 
             HoneyGraphTitle.BackColor = Color.Transparent;
@@ -2916,7 +2993,7 @@ namespace Opus
             HoneyChart.ChartTheme = null;
             skDefaultLegend1.AnimationsSpeed = TimeSpan.Parse("00:00:00.1500000");
             skDefaultLegend1.Content = null;
-            skDefaultLegend1.IsValid = true;
+            skDefaultLegend1.IsValid = false;
             skDefaultLegend1.Opacity = 1F;
             padding1.Bottom = 0F;
             padding1.Left = 0F;
@@ -2929,13 +3006,14 @@ namespace Opus
             skDefaultLegend1.Y = 0F;
             HoneyChart.Legend = skDefaultLegend1;
             HoneyChart.Location = new Point(16, 45);
+            HoneyChart.Margin = new Padding(0);
             HoneyChart.MatchAxesScreenDataRatio = false;
             HoneyChart.Name = "HoneyChart";
             HoneyChart.Size = new Size(525, 275);
             HoneyChart.TabIndex = 1;
             skDefaultTooltip1.AnimationsSpeed = TimeSpan.Parse("00:00:00.1500000");
             skDefaultTooltip1.Content = null;
-            skDefaultTooltip1.IsValid = true;
+            skDefaultTooltip1.IsValid = false;
             skDefaultTooltip1.Opacity = 1F;
             padding2.Bottom = 0F;
             padding2.Left = 0F;
@@ -3015,6 +3093,48 @@ namespace Opus
             HiveSizePanel.TabIndex = 46;
             HiveSizePanel.TopLeftRadius = 8;
             HiveSizePanel.TopRightRadius = 8;
+            // 
+            // cartesianChart1
+            // 
+            cartesianChart1.AutoUpdateEnabled = true;
+            cartesianChart1.ChartTheme = null;
+            skDefaultLegend2.AnimationsSpeed = TimeSpan.Parse("00:00:00.1500000");
+            skDefaultLegend2.Content = null;
+            skDefaultLegend2.IsValid = false;
+            skDefaultLegend2.Opacity = 1F;
+            padding3.Bottom = 0F;
+            padding3.Left = 0F;
+            padding3.Right = 0F;
+            padding3.Top = 0F;
+            skDefaultLegend2.Padding = padding3;
+            skDefaultLegend2.RemoveOnCompleted = false;
+            skDefaultLegend2.RotateTransform = 0F;
+            skDefaultLegend2.X = 0F;
+            skDefaultLegend2.Y = 0F;
+            cartesianChart1.Legend = skDefaultLegend2;
+            cartesianChart1.Location = new Point(25, 45);
+            cartesianChart1.Margin = new Padding(0);
+            cartesianChart1.MatchAxesScreenDataRatio = false;
+            cartesianChart1.Name = "cartesianChart1";
+            cartesianChart1.Size = new Size(290, 275);
+            cartesianChart1.TabIndex = 1;
+            skDefaultTooltip2.AnimationsSpeed = TimeSpan.Parse("00:00:00.1500000");
+            skDefaultTooltip2.Content = null;
+            skDefaultTooltip2.IsValid = false;
+            skDefaultTooltip2.Opacity = 1F;
+            padding4.Bottom = 0F;
+            padding4.Left = 0F;
+            padding4.Right = 0F;
+            padding4.Top = 0F;
+            skDefaultTooltip2.Padding = padding4;
+            skDefaultTooltip2.RemoveOnCompleted = false;
+            skDefaultTooltip2.RotateTransform = 0F;
+            skDefaultTooltip2.Wedge = 10;
+            skDefaultTooltip2.X = 0F;
+            skDefaultTooltip2.Y = 0F;
+            cartesianChart1.Tooltip = skDefaultTooltip2;
+            cartesianChart1.TooltipFindingStrategy = LiveChartsCore.Measure.TooltipFindingStrategy.Automatic;
+            cartesianChart1.UpdaterThrottler = TimeSpan.Parse("00:00:00.0500000");
             // 
             // HiveSizeTitle
             // 
@@ -4233,19 +4353,6 @@ namespace Opus
             DeviceDetailsTitle.Text = "Cloud Phone";
             DeviceDetailsTitle.TextAlign = ContentAlignment.MiddleLeft;
             // 
-            // DeviceDetailsStatus
-            // 
-            DeviceDetailsStatus.BackColor = Color.Transparent;
-            DeviceDetailsStatus.Font = new Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            DeviceDetailsStatus.ForeColor = Color.FromArgb(255, 128, 128);
-            DeviceDetailsStatus.Location = new Point(10, 37);
-            DeviceDetailsStatus.Margin = new Padding(0);
-            DeviceDetailsStatus.Name = "DeviceDetailsStatus";
-            DeviceDetailsStatus.Size = new Size(120, 24);
-            DeviceDetailsStatus.TabIndex = 33;
-            DeviceDetailsStatus.Text = "● Offline";
-            DeviceDetailsStatus.TextAlign = ContentAlignment.MiddleLeft;
-            // 
             // SettingsPanel
             // 
             SettingsPanel.ActiveBackColor = Color.Empty;
@@ -5258,7 +5365,6 @@ namespace Opus
             SubDashboard.BottomLeftRadius = 0;
             SubDashboard.BottomRightRadius = 0;
             SubDashboard.ContentAlignmentCustom = ContentAlignment.MiddleCenter;
-            SubDashboard.Controls.Add(DeviceDetailsStatus);
             SubDashboard.Controls.Add(sVBorderer);
             SubDashboard.Controls.Add(DeviceDetailsTitle);
             SubDashboard.Controls.Add(BackToDevicesButton);
@@ -5406,48 +5512,6 @@ namespace Opus
             PlaceholderAccount.TabIndex = 6;
             PlaceholderAccount.Text = "PlaceholderPerson";
             PlaceholderAccount.TextLeftPadding = 5;
-            // 
-            // cartesianChart1
-            // 
-            cartesianChart1.AutoUpdateEnabled = true;
-            cartesianChart1.ChartTheme = null;
-            skDefaultLegend2.AnimationsSpeed = TimeSpan.Parse("00:00:00.1500000");
-            skDefaultLegend2.Content = null;
-            skDefaultLegend2.IsValid = true;
-            skDefaultLegend2.Opacity = 1F;
-            padding3.Bottom = 0F;
-            padding3.Left = 0F;
-            padding3.Right = 0F;
-            padding3.Top = 0F;
-            skDefaultLegend2.Padding = padding3;
-            skDefaultLegend2.RemoveOnCompleted = false;
-            skDefaultLegend2.RotateTransform = 0F;
-            skDefaultLegend2.X = 0F;
-            skDefaultLegend2.Y = 0F;
-            cartesianChart1.Legend = skDefaultLegend2;
-            cartesianChart1.Location = new Point(25, 45);
-            cartesianChart1.Margin = new Padding(0);
-            cartesianChart1.MatchAxesScreenDataRatio = false;
-            cartesianChart1.Name = "cartesianChart1";
-            cartesianChart1.Size = new Size(290, 275);
-            cartesianChart1.TabIndex = 1;
-            skDefaultTooltip2.AnimationsSpeed = TimeSpan.Parse("00:00:00.1500000");
-            skDefaultTooltip2.Content = null;
-            skDefaultTooltip2.IsValid = true;
-            skDefaultTooltip2.Opacity = 1F;
-            padding4.Bottom = 0F;
-            padding4.Left = 0F;
-            padding4.Right = 0F;
-            padding4.Top = 0F;
-            skDefaultTooltip2.Padding = padding4;
-            skDefaultTooltip2.RemoveOnCompleted = false;
-            skDefaultTooltip2.RotateTransform = 0F;
-            skDefaultTooltip2.Wedge = 10;
-            skDefaultTooltip2.X = 0F;
-            skDefaultTooltip2.Y = 0F;
-            cartesianChart1.Tooltip = skDefaultTooltip2;
-            cartesianChart1.TooltipFindingStrategy = LiveChartsCore.Measure.TooltipFindingStrategy.Automatic;
-            cartesianChart1.UpdaterThrottler = TimeSpan.Parse("00:00:00.0500000");
             // 
             // Homepage
             // 
@@ -5627,7 +5691,6 @@ namespace Opus
 
         private SiticoneNetCoreUI.SiticoneAdvancedPanel DeviceDetailsOverlay;
         private SiticoneNetCoreUI.SiticoneLabel DeviceDetailsTitle;
-        private SiticoneNetCoreUI.SiticoneLabel DeviceDetailsStatus;
         private SiticoneNetCoreUI.SiticoneTextButtonAdvanced BackToDevicesButton;
         private SiticoneNetCoreUI.SiticoneAdvancedPanel DeviceOverviewContentPanel;
         private SiticoneNetCoreUI.SiticoneAdvancedPanel AccountDetailsContentPanel;
@@ -5710,6 +5773,10 @@ namespace Opus
         private SiticoneNetCoreUI.SiticoneAdvancedPanel BeeStatsPanel;
         private SiticoneNetCoreUI.SiticoneAdvancedPanel HoneyGraphPanel;
         private SiticoneNetCoreUI.SiticoneAdvancedPanel HiveSizePanel;
+
+        private SiticoneNetCoreUI.SiticoneTextButtonAdvanced AnalyticsRange24HButton;
+        private SiticoneNetCoreUI.SiticoneTextButtonAdvanced AnalyticsRange7DButton;
+        private SiticoneNetCoreUI.SiticoneTextButtonAdvanced AnalyticsRange30DButton;
 
         private SiticoneNetCoreUI.SiticoneLabel BeeStatsTitle;
         private SiticoneNetCoreUI.SiticoneLabel CurrentHoneyTitle;
