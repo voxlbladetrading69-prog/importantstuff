@@ -51,7 +51,7 @@ namespace Opus
         private readonly DeviceCacheService _cacheService;
         private readonly bool _cachePreloaded;
         private readonly bool _initialConnectivityIssue;
-        private readonly System.Windows.Forms.Timer _refreshTimer;
+        private readonly System.Windows.Forms.Timer _cachePollTimer;
         //
         public Homepage(string? welcomeUsername = null, DeviceCacheService? preloadedCacheService = null, bool initialConnectivityIssue = false)
         {
@@ -61,8 +61,8 @@ namespace Opus
             _cacheService = preloadedCacheService ?? new DeviceCacheService(_conn);
             _cachePreloaded = preloadedCacheService != null;
             _initialConnectivityIssue = initialConnectivityIssue;
-            _refreshTimer = new System.Windows.Forms.Timer { Interval = 15_000 };
-            _refreshTimer.Tick += async (_, __) => await RefreshFromCacheAsync();
+            _cachePollTimer = new System.Windows.Forms.Timer { Interval = 60_000 };
+            _cachePollTimer.Tick += async (_, __) => await PollCacheFromServerAsync();
             Device.BindStatsLabels( // set to the text labels 
                 TotalText,
                 ActiveText,
@@ -76,7 +76,7 @@ namespace Opus
                 ActiveDevicesLastDay         // "+0 in the last 24 Hours"
             );
             this.Load += InitiateDbConnection;
-            this.FormClosing += (_, __) => _refreshTimer.Stop();
+            this.FormClosing += (_, __) => _cachePollTimer.Stop();
         }
         private async void InitiateDbConnection(object? sender, EventArgs e)
         {
@@ -87,7 +87,7 @@ namespace Opus
                     await _cacheService.InitializeAsync();
                 }
                 RenderDevicesFromCache();
-                _refreshTimer.Start();
+                _cachePollTimer.Start();
 
                 if (_initialConnectivityIssue)
                 {
@@ -104,19 +104,19 @@ namespace Opus
             //    DevicesFlowLayoutPanel.Controls.Add(newDevice.DeviceButton);
             //}
         }
-        private async Task RefreshFromCacheAsync()
+        private async Task PollCacheFromServerAsync(bool refreshUi = false)
         {
             try
             {
-                var changedRows = await _cacheService.RefreshAsync();
-                if (changedRows > 0)
+                await _cacheService.RefreshAsync();
+                if (refreshUi)
                 {
                     RenderDevicesFromCache();
                 }
             }
             catch
             {
-                // Keep UI responsive if a refresh cycle fails.
+                // Keep UI responsive if a background poll fails.
             }
         }
 
@@ -132,6 +132,7 @@ namespace Opus
                 d.DeviceButton.Cursor = Cursors.Hand;
                 DevicesFlowLayoutPanel.Controls.Add(d.DeviceButton);
             }
+            CenterDeviceCards();
             Device.UpdateStats();
 
             if (_selectedDevice != null)
@@ -757,7 +758,7 @@ namespace Opus
             {
                 await _cacheService.AddAllowedDeviceAsync(dialog.EnteredHwid);
                 RenderDevicesFromCache();
-                await RefreshFromCacheAsync();
+                await PollCacheFromServerAsync(refreshUi: true);
             }
             catch
             {
