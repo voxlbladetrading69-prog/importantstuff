@@ -20,6 +20,7 @@ namespace Opus
 {
     public partial class Homepage : Form
     {
+        private readonly string _welcomeUsername;
         private enum AnalyticsRange
         {
             Last24Hours,
@@ -36,14 +37,25 @@ namespace Opus
         private readonly List<SiticoneDashboardButtonAdvanced> _dynamicAccountButtons = new();
         private readonly List<TableLayoutPanel> _dynamicPackageRows = new();
         private AnalyticsRange _selectedAnalyticsRange = AnalyticsRange.Last24Hours;
-        private readonly string _conn = "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
-
+        private readonly string _conn =
+    "Host=aws-1-ap-southeast-2.pooler.supabase.com;" +
+    "Port=6543;" +
+    "Database=postgres;" +
+    "Username=postgres.pozhzivlssyhcynpctiz;" +
+    "Password=plshelpmedead123;" +
+    "SSL Mode=Require;" +
+    "Trust Server Certificate=true;" +
+    "Timeout=5;" +
+    "Command Timeout=10;" +
+    "Pooling=false;";
         private readonly DeviceCacheService _cacheService;
         private readonly System.Windows.Forms.Timer _refreshTimer;
         //
-        public Homepage()
+        public Homepage(string? welcomeUsername = null)
         {
             InitializeComponent();
+            _welcomeUsername = string.IsNullOrWhiteSpace(welcomeUsername) ? "User" : welcomeUsername.Trim();
+            HomeLabel1.Text = $"Welcome back, {_welcomeUsername} !";
             _cacheService = new DeviceCacheService(_conn);
             _refreshTimer = new System.Windows.Forms.Timer { Interval = 15_000 };
             _refreshTimer.Tick += async (_, __) => await RefreshFromCacheAsync();
