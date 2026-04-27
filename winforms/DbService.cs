@@ -233,48 +233,40 @@ set username = excluded.username,
             await cmd.ExecuteNonQueryAsync();
         }
     }
-   public async Task<AccessToken?> GetValidAccessTokenAsync(string token)
-{
-    const string sql = @"
-select json_build_object(
-    'token', token,
-    'username', username,
-    'expiration_date', expiration_date
-)
+    public async Task<AccessToken?> GetValidAccessTokenAsync(string token)
+    {
+        const string sql = @"
+select token, username, expiration_date
 from public.access_tokens
 where token = @token
   and (expiration_date is null or expiration_date > now())
 limit 1;";
 
-    await using var conn = new NpgsqlConnection(_connString);
-    await conn.OpenAsync();
+        await using var conn = new NpgsqlConnection(_connString);
+        await conn.OpenAsync();
 
-    await using var cmd = new NpgsqlCommand(sql, conn);
-    cmd.Parameters.AddWithValue("@token", token);
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("token", token);
 
-    var result = await cmd.ExecuteScalarAsync();
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
 
-    if (result == null || result == DBNull.Value)
-        return null;
+        if (!await reader.ReadAsync())
+            return null;
 
-    using var doc = JsonDocument.Parse(result.ToString()!);
-    var root = doc.RootElement;
+        DateTime? expiration = null;
 
-    DateTime? expiration = null;
+        if (reader["expiration_date"] != DBNull.Value)
+        {
+            expiration = ((DateTime)reader["expiration_date"]).ToUniversalTime();
+        }
 
-    if (root.TryGetProperty("expiration_date", out var expProp) &&
-        expProp.ValueKind != JsonValueKind.Null)
-    {
-        expiration = expProp.GetDateTime().ToUniversalTime();
+        return new AccessToken
+        {
+            Token = reader["token"]?.ToString() ?? "",
+            Username = reader["username"]?.ToString() ?? "",
+            ExpirationDateUtc = expiration
+        };
     }
-
-    return new AccessToken
-    {
-        Token = root.GetProperty("token").GetString() ?? "",
-        Username = root.GetProperty("username").GetString() ?? "",
-        ExpirationDateUtc = expiration
-    };
-}
     private static Dictionary<string, object?> ParseJsonToDictionary(string json)
     {
         using var doc = JsonDocument.Parse(json);
