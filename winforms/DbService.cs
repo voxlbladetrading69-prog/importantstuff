@@ -17,19 +17,46 @@ public class DbService
     public async Task<List<AccountEventRow>> GetEventsSinceAsync(DateTime sinceUtc)
     {
         const string sql = @"
-        select
-            d.id as device_id,
-            d.hwid_hash,
-            coalesce(d.device_name, '') as device_name,
-            a.id as account_id,
-            a.username,
-            e.event_time,
-            e.values_jsonb
-        from public.account_events e
-        join public.accounts a on a.id = e.account_id
-        join public.devices d on d.id = a.device_id
-        where e.event_time > @since
-        order by e.event_time asc;";
+select
+    d.id as device_id,
+    d.hwid_hash,
+    coalesce(d.device_name, '') as device_name,
+    a.id as account_id,
+    a.username,
+    e.event_time,
+    (
+      coalesce(e.values_jsonb, '{}'::jsonb)
+      ||
+      jsonb_build_object(
+        'device_info', jsonb_build_object(
+          'device_name', d.device_name,
+          'hwid_hash', d.hwid_hash,
+          'event_time', ds.event_time,
+          'uptime_sec', ds.uptime_sec,
+          'battery_pct', ds.battery_pct,
+          'battery_temp_c', ds.battery_temp_c,
+          'ram_used_mb', ds.ram_used_mb,
+          'ram_free_mb', ds.ram_free_mb,
+          'storage_free_mb', ds.storage_free_mb,
+          'ping_ms', ds.ping_ms,
+          'charging', ds.charging,
+          'network', ds.network
+        )
+      )
+    ) as values_jsonb
+from public.account_events e
+join public.accounts a on a.id = e.account_id
+join public.devices d on d.id = a.device_id
+left join lateral (
+    select s.*
+    from public.device_snapshots s
+    where s.device_id = d.id
+      and s.event_time <= e.event_time
+    order by s.event_time desc, s.id desc
+    limit 1
+) ds on true
+where e.event_time > @since
+order by e.event_time asc;";
 
         var rows = new List<AccountEventRow>();
 
@@ -60,19 +87,46 @@ public class DbService
     public async Task<List<AccountEventRow>> GetAllEventsAsync(int limit = 500)
     {
         const string sql = @"
-            select
-                d.id as device_id,
-                d.hwid_hash,
-                coalesce(d.device_name, '') as device_name,
-                a.id as account_id,
-                a.username,
-                e.event_time,
-                e.values_jsonb
-            from public.account_events e
-            join public.accounts a on a.id = e.account_id
-            join public.devices d on d.id = a.device_id
-            order by e.event_time desc
-            limit @limit;";
+select
+    d.id as device_id,
+    d.hwid_hash,
+    coalesce(d.device_name, '') as device_name,
+    a.id as account_id,
+    a.username,
+    e.event_time,
+    (
+      coalesce(e.values_jsonb, '{}'::jsonb)
+      ||
+      jsonb_build_object(
+        'device_info', jsonb_build_object(
+          'device_name', d.device_name,
+          'hwid_hash', d.hwid_hash,
+          'event_time', ds.event_time,
+          'uptime_sec', ds.uptime_sec,
+          'battery_pct', ds.battery_pct,
+          'battery_temp_c', ds.battery_temp_c,
+          'ram_used_mb', ds.ram_used_mb,
+          'ram_free_mb', ds.ram_free_mb,
+          'storage_free_mb', ds.storage_free_mb,
+          'ping_ms', ds.ping_ms,
+          'charging', ds.charging,
+          'network', ds.network
+        )
+      )
+    ) as values_jsonb
+from public.account_events e
+join public.accounts a on a.id = e.account_id
+join public.devices d on d.id = a.device_id
+left join lateral (
+    select s.*
+    from public.device_snapshots s
+    where s.device_id = d.id
+      and s.event_time <= e.event_time
+    order by s.event_time desc, s.id desc
+    limit 1
+) ds on true
+order by e.event_time desc
+limit @limit;";
 
         var rows = new List<AccountEventRow>();
 
