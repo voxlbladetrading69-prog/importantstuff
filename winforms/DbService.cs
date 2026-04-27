@@ -264,6 +264,64 @@ limit 1;";
             ExpirationDateUtc = expiration
         };
     }
+
+
+    public async Task EnsureAddedDevicesTableAsync()
+    {
+        const string sql = @"
+create table if not exists public.added_devices
+(
+    hwid_hash text primary key,
+    created_at timestamptz not null default now()
+);";
+
+        await using var conn = new NpgsqlConnection(_connString);
+        await conn.OpenAsync();
+
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task<List<string>> GetAddedDeviceHwidsAsync()
+    {
+        const string sql = @"
+select hwid_hash
+from public.added_devices;";
+
+        var result = new List<string>();
+
+        await using var conn = new NpgsqlConnection(_connString);
+        await conn.OpenAsync();
+
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var hwid = reader["hwid_hash"]?.ToString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(hwid))
+            {
+                result.Add(hwid.Trim());
+            }
+        }
+
+        return result;
+    }
+
+    public async Task AddAddedDeviceAsync(string hwidHash)
+    {
+        const string sql = @"
+insert into public.added_devices (hwid_hash)
+values (@hwid_hash)
+on conflict (hwid_hash) do nothing;";
+
+        await using var conn = new NpgsqlConnection(_connString);
+        await conn.OpenAsync();
+
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("hwid_hash", hwidHash.Trim());
+        await cmd.ExecuteNonQueryAsync();
+    }
+
     private static Dictionary<string, object?> ParseJsonToDictionary(string json)
     {
         using var doc = JsonDocument.Parse(json);
