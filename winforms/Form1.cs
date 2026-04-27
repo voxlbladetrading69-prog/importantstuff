@@ -1,8 +1,10 @@
 using Krypton.Toolkit;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinFormAnimation;
 
@@ -10,6 +12,7 @@ namespace Opus
 {
     public partial class Form1 : Form
     {
+        private readonly DbService _db;
         public Form1()
         {
             InitializeComponent();
@@ -20,25 +23,52 @@ namespace Opus
             this.UpdateStyles();
             this.MouseDown += FormDrag_MouseDown;
             SignInButton.Click += SignInButton_Click;
+            const string conn =
+                "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
+            _db = new DbService(conn);
+            this.Load += Form1_Load;
         }
 
         // IMPORTANT STUFF BELOW, DO NOT TOUCH UNLESS YOU KNOW WHAT YOU ARE DOING
         private Point titleStart, underStart, panelStart;
-        private readonly HashSet<string> validCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private async void Form1_Load(object? sender, EventArgs e)
         {
-            "testing123",
-            "ABCD-1234-EFGH",
-            "TEST-0000-LOGIN",
-            "OPUS-2026-ACCESS"
-        };
+            try
+            {
+                await _db.EnsureAccessTokensTableAsync();
+                await _db.SeedAccessTokensAsync(new List<AccessToken>
+                {
+                    new AccessToken { Token = "testing123", Username = "tester", ExpirationDateUtc = null },
+                    new AccessToken { Token = "ABCD-1234-EFGH", Username = "alpha_user", ExpirationDateUtc = DateTime.UtcNow.AddYears(2) },
+                    new AccessToken { Token = "TEST-0000-LOGIN", Username = "qa_login", ExpirationDateUtc = DateTime.UtcNow.AddYears(1) },
+                    new AccessToken { Token = "OPUS-2026-ACCESS", Username = "opus_user", ExpirationDateUtc = new DateTime(2026, 12, 31, 23, 59, 59, DateTimeKind.Utc) }
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to initialize Access Tokens table.\n\n{ex.Message}", "Database Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
         //
         // METHODS
         //
         private async void SignInButton_Click(object sender, EventArgs e)
         {
             string enteredCode = WhitelistBox.Text.Trim();
-
-            if (validCodes.Contains(enteredCode))
+            AccessToken? matchedToken = null;
+            try
+            {
+                matchedToken = await _db.GetValidAccessTokenAsync(enteredCode);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not verify access token.\n\n{ex.Message}", "Database Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                SignInButton.StopActivity();
+                return;
+            }
+            if (matchedToken != null)
             {
                 Logo.Anchor = AnchorStyles.None;
                 this.Region = null;
@@ -173,7 +203,7 @@ namespace Opus
             }
             else
             {
-                MessageBox.Show("Invalid whitelist code.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Invalid or expired access token.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 SignInButton.StopActivity();
             }
         }
