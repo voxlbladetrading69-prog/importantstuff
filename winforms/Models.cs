@@ -11,3 +11,9 @@ public class AccountEventRow
     public DateTime EventTimeUtc { get; set; }
     public Dictionary<string, object?> Values { get; set; } = new();
 }
+public class AccessToken
+{
+    public string Token { get; set; } = "";
+    public string Username { get; set; } = "";
+    public DateTime? ExpirationDateUtc { get; set; }
+}
