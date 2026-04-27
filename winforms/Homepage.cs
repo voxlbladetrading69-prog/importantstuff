@@ -20,6 +20,13 @@ namespace Opus
 {
     public partial class Homepage : Form
     {
+        private enum AnalyticsRange
+        {
+            Last24Hours,
+            LastWeek,
+            LastMonth
+        }
+
         // state variables
         string activePanel = "DevicesPanel";
         private Device? _selectedDevice;
@@ -28,6 +35,7 @@ namespace Opus
         private string activeDeviceDetailTab = "DeviceOverview";
         private readonly List<SiticoneDashboardButtonAdvanced> _dynamicAccountButtons = new();
         private readonly List<TableLayoutPanel> _dynamicPackageRows = new();
+        private AnalyticsRange _selectedAnalyticsRange = AnalyticsRange.Last24Hours;
         private readonly string _conn = "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
 
         private readonly DeviceCacheService _cacheService;
@@ -382,7 +390,12 @@ namespace Opus
             AccountDetailsStatus.Text = active ? "● Active" : "● Inactive";
             AccountDetailsStatus.ForeColor = active ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
 
-            var points = account.MetricTimeline.OrderBy(p => p.EventTimeUtc).TakeLast(60).ToList();
+            var cutoffUtc = DateTime.UtcNow - GetLookbackWindow(_selectedAnalyticsRange);
+            var points = account.MetricTimeline
+                .Where(p => p.EventTimeUtc >= cutoffUtc)
+                .OrderBy(p => p.EventTimeUtc)
+                .TakeLast(300)
+                .ToList(); 
             var eventCount = points.Count;
             if (eventCount == 0)
             {
@@ -413,6 +426,7 @@ namespace Opus
             {
                 maxHoney += 1;
                 minHoney -= 1;
+                range = maxHoney - minHoney;
             }
 
 
@@ -423,17 +437,29 @@ namespace Opus
                     Values = honey,
                     GeometrySize = 0,
                     Fill = null,
-                    Stroke = new SolidColorPaint(SKColors.Gold, 2)
+                    Stroke = new SolidColorPaint(SKColors.Gold, 4)
                 }
             };
-            HoneyChart.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = minHoney-range*0.1, MaxLimit = maxHoney+range*0.1 } };
+            HoneyChart.YAxes = new LiveChartsCore.SkiaSharpView.Axis[]
+            {
+                new LiveChartsCore.SkiaSharpView.Axis
+                {
+                    MinLimit = minHoney - range * 0.1,
+                    MaxLimit = maxHoney + range * 0.1,
+                    TextSize = 12,
+                    LabelsPaint = new SolidColorPaint(SKColors.White),
+                    SeparatorsPaint = new SolidColorPaint(new SKColor(255, 255, 255, 40))
+                }
+            };
             HoneyChart.XAxes = new LiveChartsCore.SkiaSharpView.Axis[]
             {
                 new LiveChartsCore.SkiaSharpView.Axis
                 {
                     Labels = xAxisLabels,
                     LabelsRotation = 0,
-                    TextSize = 10,
+                    TextSize = 12,
+                    LabelsPaint = new SolidColorPaint(SKColors.White),
+                    SeparatorsPaint = new SolidColorPaint(new SKColor(255, 255, 255, 20)),
                     MinStep = 1,
                     ForceStepToMin = true
                 }
@@ -445,17 +471,30 @@ namespace Opus
                     Values = hive,
                     GeometrySize = 0,
                     Fill = null,
-                    Stroke = new SolidColorPaint(SKColors.DeepSkyBlue, 2)
+                    Stroke = new SolidColorPaint(SKColors.DeepSkyBlue, 4)
                 }
             };
-            cartesianChart1.YAxes = new LiveChartsCore.SkiaSharpView.Axis[] { new LiveChartsCore.SkiaSharpView.Axis { MinLimit = 0, MaxLimit = 50 } };
+            var (minHive, maxHive) = GetExpandedAxisLimits(hive.Min(), hive.Max());
+            cartesianChart1.YAxes = new LiveChartsCore.SkiaSharpView.Axis[]
+            {
+                new LiveChartsCore.SkiaSharpView.Axis
+                {
+                    MinLimit = minHive,
+                    MaxLimit = maxHive,
+                    TextSize = 12,
+                    LabelsPaint = new SolidColorPaint(SKColors.White),
+                    SeparatorsPaint = new SolidColorPaint(new SKColor(255, 255, 255, 40))
+                }
+            };
             cartesianChart1.XAxes = new LiveChartsCore.SkiaSharpView.Axis[]
             {
                 new LiveChartsCore.SkiaSharpView.Axis
                 {
                     Labels = xAxisLabels,
                     LabelsRotation = 0,
-                    TextSize = 10,
+                    TextSize = 12,
+                    LabelsPaint = new SolidColorPaint(SKColors.White),
+                    SeparatorsPaint = new SolidColorPaint(new SKColor(255, 255, 255, 20)),
                     MinStep = 1,
                     ForceStepToMin = true
                 }
@@ -476,19 +515,43 @@ namespace Opus
             return (minLimit, maxLimit);
         }
 
-        private static string[] BuildTimelineLabels(List<DateTime> timestampsUtc, int originalEventCount)
+        private string[] BuildTimelineLabels(List<DateTime> timestampsUtc, int originalEventCount)
         {
             if (timestampsUtc.Count == 0) return Array.Empty<string>();
+            var timeFormat = _selectedAnalyticsRange switch
+            {
+                AnalyticsRange.Last24Hours => "HH:mm",
+                AnalyticsRange.LastWeek => "MM-dd HH:mm",
+                AnalyticsRange.LastMonth => "MM-dd",
+                _ => "HH:mm"
+            };
+
             if (originalEventCount == 1 && timestampsUtc.Count >= 3)
             {
-                return new[] { "", timestampsUtc[1].ToLocalTime().ToString("HH:mm:ss"), "" };
+                return new[] { "", timestampsUtc[1].ToLocalTime().ToString(timeFormat), "" };
             }
 
             var labels = Enumerable.Repeat("", timestampsUtc.Count).ToArray();
-            labels[0] = timestampsUtc[0].ToLocalTime().ToString("HH:mm:ss");
-            labels[^1] = timestampsUtc[^1].ToLocalTime().ToString("HH:mm:ss");
+            return new[] { "", timestampsUtc[1].ToLocalTime().ToString(timeFormat), "" };
             return labels;
         }
+        public void SetGraphRangeToLast24Hours() => SetAnalyticsRange(AnalyticsRange.Last24Hours);
+        public void SetGraphRangeToLastWeek() => SetAnalyticsRange(AnalyticsRange.LastWeek);
+        public void SetGraphRangeToLastMonth() => SetAnalyticsRange(AnalyticsRange.LastMonth);
+
+        private void SetAnalyticsRange(AnalyticsRange range)
+        {
+            _selectedAnalyticsRange = range;
+            RefreshSelectedDeviceAnalytics();
+        }
+
+        private static TimeSpan GetLookbackWindow(AnalyticsRange range) => range switch
+        {
+            AnalyticsRange.Last24Hours => TimeSpan.FromHours(24),
+            AnalyticsRange.LastWeek => TimeSpan.FromDays(7),
+            AnalyticsRange.LastMonth => TimeSpan.FromDays(30),
+            _ => TimeSpan.FromHours(24)
+        };
         private static int TryGetInt(Dictionary<string, object?> values, string key)
         {
             if (!values.TryGetValue(key, out var value) || value == null) return 0;
