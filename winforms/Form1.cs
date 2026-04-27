@@ -1,0 +1,236 @@
+using Krypton.Toolkit;
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+using WinFormAnimation;
+
+namespace Opus
+{
+    public partial class Form1 : Form
+    {
+        public Form1()
+        {
+            InitializeComponent();
+
+            this.SetStyle(ControlStyles.UserPaint |
+                          ControlStyles.AllPaintingInWmPaint |
+                          ControlStyles.OptimizedDoubleBuffer, true);
+            this.UpdateStyles();
+            this.MouseDown += FormDrag_MouseDown;
+            SignInButton.Click += SignInButton_Click;
+        }
+
+        // IMPORTANT STUFF BELOW, DO NOT TOUCH UNLESS YOU KNOW WHAT YOU ARE DOING
+        private Point titleStart, underStart, panelStart;
+        private readonly HashSet<string> validCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "testing123",
+            "ABCD-1234-EFGH",
+            "TEST-0000-LOGIN",
+            "OPUS-2026-ACCESS"
+        };
+        //
+        // METHODS
+        //
+        private async void SignInButton_Click(object sender, EventArgs e)
+        {
+            string enteredCode = WhitelistBox.Text.Trim();
+
+            if (validCodes.Contains(enteredCode))
+            {
+                Logo.Anchor = AnchorStyles.None;
+                this.Region = null;
+                // Move title up
+                new Animator2D(new Path2D(
+                    titleStart.X, titleStart.X,
+                    titleStart.Y, titleStart.Y - 228,
+                    400,0, AnimationFunctions.CubicEaseOut))
+                .Play(TitleText, Animator2D.KnownProperties.Location);
+
+                // Move undertext up
+                new Animator2D(new Path2D(
+                    underStart.X, underStart.X,
+                    underStart.Y, underStart.Y - 228,
+                    400, 0, AnimationFunctions.CubicEaseOut))
+                .Play(Undertext, Animator2D.KnownProperties.Location);
+
+                // Move panel down
+                new Animator2D(new Path2D(
+                    panelStart.X, panelStart.X,
+                    panelStart.Y, panelStart.Y + 378,
+                    400, 0, AnimationFunctions.CubicEaseOut))
+                .Play(WhitelistPanel, Animator2D.KnownProperties.Location);
+                
+                int targetX = (this.Width - Logo.Width) / 2;
+                int targetY = (this.Height - Logo.Height) / 2;
+
+                // Recenter
+                new Animator2D(new Path2D(
+                    Logo.Left, targetX,
+                    Logo.Top, targetY,
+                    400, 0, AnimationFunctions.CubicEaseOut))
+                .Play(Logo, Animator2D.KnownProperties.Location);
+
+                await Task.Delay(500);
+
+                targetX = (350 - Logo.Width) / 2;
+                targetY = (150 - Logo.Height) / 2;
+
+                // Resize
+                new Animator2D(new Path2D(
+                    this.Width, 350,
+                    this.Height, 150,
+                    400, 0, AnimationFunctions.Liner))
+                .Play(this, Animator2D.KnownProperties.Size);
+
+                // Recenter pt2
+                new Animator2D(new Path2D(
+                    Logo.Left, targetX,
+                    Logo.Top, targetY,
+                    400, 0, AnimationFunctions.Liner))
+                .Play(Logo, Animator2D.KnownProperties.Location);
+
+                await Task.Delay(1000);
+
+                // Expand form to Homepage size and center it on screen,
+                // while moving/resizing the logo into its header position.
+
+                Rectangle screen = Screen.FromControl(this).WorkingArea;
+
+                int targetFormWidth = 1167;
+                int targetFormHeight = 600;
+
+                // final centered form position
+                int targetFormX = screen.Left + (screen.Width - targetFormWidth) / 2;
+                int targetFormY = screen.Top + (screen.Height - targetFormHeight) / 2;
+
+                int targetCloseX = targetFormWidth - closeButton.Width - 10;
+                int targetCloseY = 5; // or 0 depending on your header alignment
+
+                // Make sure it follows top-right logic
+                closeButton.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+
+                // Animate to final position
+                new Animator2D(new Path2D(
+                    closeButton.Left, targetCloseX,
+                    closeButton.Top, targetCloseY,
+                    450, 0, AnimationFunctions.CubicEaseOut))
+                .Play(closeButton, Animator2D.KnownProperties.Location);
+
+                Logo.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+
+                // animate form size
+                new Animator2D(new Path2D(
+                    this.Width, targetFormWidth,
+                    this.Height, targetFormHeight,
+                    450, 0, AnimationFunctions.Liner))
+                .Play(this, Animator2D.KnownProperties.Size);
+
+                // animate form location so it ends centered on screen
+                new Animator2D(new Path2D(
+                    this.Left, targetFormX,
+                    this.Top, targetFormY,
+                    450, 0, AnimationFunctions.Liner))
+                .Play(this, Animator2D.KnownProperties.Location);
+
+                // Move logo to header position
+                int finalLogoX = 10;
+                int finalLogoY = 0;
+
+                new Animator2D(new Path2D(
+                    Logo.Left, finalLogoX,
+                    Logo.Top, finalLogoY,
+                    450, 0, AnimationFunctions.CubicEaseOut))
+                .Play(Logo, Animator2D.KnownProperties.Location);
+
+                // Resize logo to 25x25
+                new Animator2D(new Path2D(
+                    Logo.Width, 25,        // Width: current → 25
+                    Logo.Height, 25,       // Height: current → 25
+                    450, 0, AnimationFunctions.CubicEaseOut))
+                .Play(Logo, Animator2D.KnownProperties.Size);
+
+
+                await Task.Delay(460);
+
+                // Open homepage in same place
+                Homepage home = new Homepage();
+                home.StartPosition = FormStartPosition.Manual;
+                home.Location = this.Location;
+                home.Opacity = 0;
+                home.Show();
+
+                for (double i = 0; i <= 1; i += 0.1)
+                {
+                    home.Opacity = i;
+                    this.Opacity = 1 - i;
+                    await Task.Delay(15);
+                }
+
+                this.Hide();
+            }
+            else
+            {
+                MessageBox.Show("Invalid whitelist code.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                SignInButton.StopActivity();
+            }
+        }
+        // custom rounding 
+        private GraphicsPath GetRoundedPath(Rectangle rect, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+
+            int diameter = radius * 2;
+
+            path.StartFigure();
+            path.AddArc(rect.X, rect.Y, diameter, diameter, 180, 90);
+            path.AddArc(rect.Right - diameter, rect.Y, diameter, diameter, 270, 90);
+            path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+
+            return path;
+        }
+
+        private void RoundCorners(Control target, int radius)
+        {
+            if (target.Width <= 0 || target.Height <= 0)
+                return;
+
+            using (GraphicsPath path = GetRoundedPath(target.ClientRectangle, radius))
+            {
+                target.Region = new Region(path);
+            }
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            titleStart = TitleText.Location;
+            underStart = Undertext.Location;
+            panelStart = WhitelistPanel.Location;
+            RoundCorners(this, 8);
+        }
+        // DO NO CHANGE ANYTHING BELOW
+        // Form Dragging
+        [DllImport("user32.dll")]
+        private static extern bool ReleaseCapture();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+
+        private const int WM_NCLBUTTONDOWN = 0xA1;
+        private const int HTCAPTION = 0x2;
+
+        private void FormDrag_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                ReleaseCapture();
+                SendMessage(this.Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+            }
+        }
+    }
+}
