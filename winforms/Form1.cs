@@ -25,7 +25,16 @@ namespace Opus
             this.MouseDown += FormDrag_MouseDown;
             SignInButton.Click += SignInButton_Click;
             const string conn =
-                "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
+    "Host=aws-1-ap-southeast-2.pooler.supabase.com;" +
+    "Port=6543;" +
+    "Database=postgres;" +
+    "Username=postgres.pozhzivlssyhcynpctiz;" +
+    "Password=plshelpmedead123;" +
+    "SSL Mode=Require;" +
+    "Trust Server Certificate=true;" +
+    "Timeout=5;" +
+    "Command Timeout=10;" +
+    "Pooling=false;";
             _db = new DbService(conn);
 
         }
