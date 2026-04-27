@@ -49,6 +49,7 @@ namespace Opus
             if (_isSigningIn) return;
 
             _isSigningIn = true;
+            SignInButton.StartActivity();
             SignInButton.Enabled = false;
             string enteredCode = WhitelistBox.Text.Trim();
             AccessToken? matchedToken = null;
