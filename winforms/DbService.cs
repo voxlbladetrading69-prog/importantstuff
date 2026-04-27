@@ -241,31 +241,29 @@ from public.access_tokens
 where token = @token
   and (expiration_date is null or expiration_date > now())
 limit 1;";
-
-        await using var conn = new NpgsqlConnection(_connString);
-        await conn.OpenAsync();
-
-        await using var cmd = new NpgsqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("token", token);
-
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
-
-        if (!await reader.ReadAsync())
-            return null;
-
-        DateTime? expiration = null;
-
-        if (reader["expiration_date"] != DBNull.Value)
+        return await Task.Run(() =>
         {
-            expiration = ((DateTime)reader["expiration_date"]).ToUniversalTime();
-        }
+            using var conn = new NpgsqlConnection(_connString);
+            conn.Open();
 
-        return new AccessToken
-        {
-            Token = reader["token"]?.ToString() ?? "",
-            Username = reader["username"]?.ToString() ?? "",
-            ExpirationDateUtc = expiration
-        };
+            using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("token", token);
+
+            using var reader = cmd.ExecuteReader(CommandBehavior.SingleRow);
+            if (!reader.Read())
+                return (AccessToken?)null;
+            DateTime? expiration = null;
+            if (reader["expiration_date"] != DBNull.Value)
+            {
+                expiration = ((DateTime)reader["expiration_date"]).ToUniversalTime();
+            }
+            return new AccessToken
+            {
+                Token = reader["token"]?.ToString() ?? "",
+                Username = reader["username"]?.ToString() ?? "",
+                ExpirationDateUtc = expiration
+            };
+        });
     }
     private static Dictionary<string, object?> ParseJsonToDictionary(string json)
     {
