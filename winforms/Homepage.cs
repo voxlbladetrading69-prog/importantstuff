@@ -49,14 +49,18 @@ namespace Opus
     "Command Timeout=10;" +
     "Pooling=false;";
         private readonly DeviceCacheService _cacheService;
+        private readonly bool _cachePreloaded;
+        private readonly bool _initialConnectivityIssue;
         private readonly System.Windows.Forms.Timer _refreshTimer;
         //
-        public Homepage(string? welcomeUsername = null)
+        public Homepage(string? welcomeUsername = null, DeviceCacheService? preloadedCacheService = null, bool initialConnectivityIssue = false)
         {
             InitializeComponent();
             _welcomeUsername = string.IsNullOrWhiteSpace(welcomeUsername) ? "User" : welcomeUsername.Trim();
             HomeLabel1.Text = $"Welcome back, {_welcomeUsername} !";
-            _cacheService = new DeviceCacheService(_conn);
+            _cacheService = preloadedCacheService ?? new DeviceCacheService(_conn);
+            _cachePreloaded = preloadedCacheService != null;
+            _initialConnectivityIssue = initialConnectivityIssue;
             _refreshTimer = new System.Windows.Forms.Timer { Interval = 15_000 };
             _refreshTimer.Tick += async (_, __) => await RefreshFromCacheAsync();
             Device.BindStatsLabels( // set to the text labels 
@@ -78,13 +82,21 @@ namespace Opus
         {
             try
             {
-                await _cacheService.InitializeAsync();
+                if (!_cachePreloaded)
+                {
+                    await _cacheService.InitializeAsync();
+                }
                 RenderDevicesFromCache();
                 _refreshTimer.Start();
+
+                if (_initialConnectivityIssue)
+                {
+                    MessageBox.Show("Slow internet connection.", "Connection issue", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
-            catch (Exception ex)
+            catch
             {
-                MessageBox.Show(ex.ToString(), "Load failed");
+                MessageBox.Show("Slow internet connection.", "Connection issue", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             //for (int i = 0; i < 10; i++) // add some fake devices for demo purposes
             //{
@@ -542,10 +554,23 @@ namespace Opus
             {
                 return new[] { "", timestampsUtc[1].ToLocalTime().ToString(timeFormat), "" };
             }
+            RefreshAnalyticsRangeButtonStates();
 
             var labels = Enumerable.Repeat("", timestampsUtc.Count).ToArray();
             return new[] { "", timestampsUtc[1].ToLocalTime().ToString(timeFormat), "" };
             return labels;
+        }
+        private void RefreshAnalyticsRangeButtonStates()
+        {
+            SetRangeButtonSelectedState(AnalyticsRange24HButton, _selectedAnalyticsRange == AnalyticsRange.Last24Hours);
+            SetRangeButtonSelectedState(AnalyticsRange7DButton, _selectedAnalyticsRange == AnalyticsRange.LastWeek);
+            SetRangeButtonSelectedState(AnalyticsRange30DButton, _selectedAnalyticsRange == AnalyticsRange.LastMonth);
+        }
+
+        private static void SetRangeButtonSelectedState(SiticoneTextButtonAdvanced button, bool isSelected)
+        {
+            button.TextColor = isSelected ? Color.White : Color.DarkGray;
+            button.HoverShowUnderline = isSelected;
         }
         public void SetGraphRangeToLast24Hours() => SetAnalyticsRange(AnalyticsRange.Last24Hours);
         public void SetGraphRangeToLastWeek() => SetAnalyticsRange(AnalyticsRange.LastWeek);
@@ -674,6 +699,10 @@ namespace Opus
                     child.Click += GradientToggler;
                     child.Click += DashboardButton_Click;
                 }
+                AnalyticsRange24HButton.Click += (_, __) => SetGraphRangeToLast24Hours();
+                AnalyticsRange7DButton.Click += (_, __) => SetGraphRangeToLastWeek();
+                AnalyticsRange30DButton.Click += (_, __) => SetGraphRangeToLastMonth();
+                RefreshAnalyticsRangeButtonStates();
             }
             DashboardButton_Click(HomeButton, EventArgs.Empty);
             DeviceOverview.Click += (_, __) =>
@@ -686,6 +715,7 @@ namespace Opus
             GradientToggler(HomeButton, EventArgs.Empty);
             BackToDevicesButton.Click += BackToDevicesButton_Click;
             PositionStatsCards();
+            siticoneButtonAdvanced1.Click += AddDeviceButton_Click;
             //Device newDevice2 = new Device("linging phone", 0, 5, "2 hours ago", Color.FromArgb(255, 128, 128));
             //DevicesFlowLayoutPanel.Controls.Add(newDevice2.DeviceButton);
         }
@@ -712,6 +742,27 @@ namespace Opus
         private void DevicesPanel_ControlAdded(object sender, ControlEventArgs e)
         {
             CenterDeviceCards();
+        }
+
+        private async void AddDeviceButton_Click(object? sender, EventArgs e)
+        {
+            using var dialog = new AddDeviceDialog
+            {
+                StartPosition = FormStartPosition.CenterParent
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+            try
+            {
+                await _cacheService.AddAllowedDeviceAsync(dialog.EnteredHwid);
+                RenderDevicesFromCache();
+                await RefreshFromCacheAsync();
+            }
+            catch
+            {
+                MessageBox.Show("Slow internet connection.", "Connection issue", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void InfoLabel6_Click(object sender, EventArgs e)
