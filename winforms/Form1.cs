@@ -26,8 +26,9 @@ namespace Opus
             this.MouseDown += FormDrag_MouseDown;
             SignInButton.Click += SignInButton_Click;
             const string conn =
-                "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=15;Command Timeout=30"; 
+                "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
             _db = new DbService(conn);
+
             this.Load += Form1_Load;
         }
 
@@ -68,9 +69,10 @@ namespace Opus
             SignInButton.Enabled = false;
             string enteredCode = WhitelistBox.Text.Trim();
             AccessToken? matchedToken = null;
+;
             try
             {
-                matchedToken = await _db.GetValidAccessTokenAsync(enteredCode);
+                //matchedToken = await _db.GetValidAccessTokenAsync(enteredCode);
             }
             catch (Exception ex)
             {
