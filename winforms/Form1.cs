@@ -13,6 +13,8 @@ namespace Opus
     public partial class Form1 : Form
     {
         private readonly DbService _db;
+        private bool _isSigningIn;
+        private bool _dbReady;
         public Form1()
         {
             InitializeComponent();
@@ -24,7 +26,7 @@ namespace Opus
             this.MouseDown += FormDrag_MouseDown;
             SignInButton.Click += SignInButton_Click;
             const string conn =
-                "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
+                "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=15;Command Timeout=30"; 
             _db = new DbService(conn);
             this.Load += Form1_Load;
         }
@@ -35,19 +37,18 @@ namespace Opus
         {
             try
             {
+                SignInButton.Enabled = false;
                 await _db.EnsureAccessTokensTableAsync();
-                await _db.SeedAccessTokensAsync(new List<AccessToken>
-                {
-                    new AccessToken { Token = "testing123", Username = "tester", ExpirationDateUtc = null },
-                    new AccessToken { Token = "ABCD-1234-EFGH", Username = "alpha_user", ExpirationDateUtc = DateTime.UtcNow.AddYears(2) },
-                    new AccessToken { Token = "TEST-0000-LOGIN", Username = "qa_login", ExpirationDateUtc = DateTime.UtcNow.AddYears(1) },
-                    new AccessToken { Token = "OPUS-2026-ACCESS", Username = "opus_user", ExpirationDateUtc = new DateTime(2026, 12, 31, 23, 59, 59, DateTimeKind.Utc) }
-                });
+                _dbReady = true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to initialize Access Tokens table.\n\n{ex.Message}", "Database Error",
+                MessageBox.Show($"Failed to initialize Access Tokens table.\n\n{ex.Message}", "Database!! Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                SignInButton.Enabled = true;
             }
         }
         //
@@ -55,6 +56,16 @@ namespace Opus
         //
         private async void SignInButton_Click(object sender, EventArgs e)
         {
+            if (_isSigningIn) return;
+            if (!_dbReady)
+            {
+                MessageBox.Show("Database is still initializing. Please wait a moment and try again.", "Please Wait",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            _isSigningIn = true;
+            SignInButton.Enabled = false;
             string enteredCode = WhitelistBox.Text.Trim();
             AccessToken? matchedToken = null;
             try
@@ -66,6 +77,8 @@ namespace Opus
                 MessageBox.Show($"Could not verify access token.\n\n{ex.Message}", "Database Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 SignInButton.StopActivity();
+                _isSigningIn = false;
+                SignInButton.Enabled = true;
                 return;
             }
             if (matchedToken != null)
@@ -186,7 +199,7 @@ namespace Opus
                 await Task.Delay(460);
 
                 // Open homepage in same place
-                Homepage home = new Homepage();
+                Homepage home = new Homepage(matchedToken.Username);
                 home.StartPosition = FormStartPosition.Manual;
                 home.Location = this.Location;
                 home.Opacity = 0;
@@ -205,6 +218,8 @@ namespace Opus
             {
                 MessageBox.Show("Invalid or expired access token.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 SignInButton.StopActivity();
+                _isSigningIn = false;
+                SignInButton.Enabled = true;
             }
         }
         // custom rounding 
