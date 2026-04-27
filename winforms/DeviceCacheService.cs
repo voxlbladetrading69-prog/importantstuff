@@ -12,6 +12,7 @@ namespace Opus
     {
         private readonly DbService _db;
         private readonly Dictionary<string, DeviceState> _devicesById = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _allowedHwids = new(StringComparer.OrdinalIgnoreCase);
         private readonly ReaderWriterLockSlim _lock = new();
         private DateTime _lastEventUtc = DateTime.MinValue;
         private bool _initialized;
@@ -23,6 +24,13 @@ namespace Opus
 
         public async Task InitializeAsync(int initialLimit = 5000)
         {
+            await _db.EnsureAddedDevicesTableAsync();
+            var addedHwids = await _db.GetAddedDeviceHwidsAsync();
+            _allowedHwids.Clear();
+            foreach (var hwid in addedHwids)
+            {
+                _allowedHwids.Add(NormalizeHwid(hwid));
+            }
             var rows = await _db.GetAllEventsAsync(initialLimit);
             rows.Reverse(); // oldest -> newest so each newer row overwrites previous state cleanly
             ApplyRows(rows);
@@ -50,6 +58,7 @@ namespace Opus
             try
             {
                 return _devicesById.Values
+                    .Where(d => !string.IsNullOrWhiteSpace(d.HwidHash) && _allowedHwids.Contains(NormalizeHwid(d.HwidHash)))
                     .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(d =>
                     {
@@ -83,6 +92,7 @@ namespace Opus
             try
             {
                 if (!_devicesById.TryGetValue(deviceId, out var source)) return null;
+                if (string.IsNullOrWhiteSpace(source.HwidHash) || !_allowedHwids.Contains(NormalizeHwid(source.HwidHash))) return null;
 
                 var clone = new DeviceState
                 {
@@ -113,6 +123,13 @@ namespace Opus
             {
                 _lock.ExitReadLock();
             }
+        }
+
+        public async Task AddAllowedDeviceAsync(string hwid)
+        {
+            var normalized = NormalizeHwid(hwid);
+            await _db.AddAddedDeviceAsync(normalized);
+            _allowedHwids.Add(normalized);
         }
         private void ApplyRows(List<AccountEventRow> rows)
         {
@@ -247,6 +264,10 @@ namespace Opus
 
         private static DateTime MaxUtc(DateTime a, DateTime b)
             => a >= b ? a : b;
+
+        private static string NormalizeHwid(string hwid)
+            => (hwid ?? string.Empty).Trim();
+
 
         private static string ToAgoText(DateTime utc)
         {
