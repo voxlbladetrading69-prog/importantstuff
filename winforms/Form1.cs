@@ -14,7 +14,6 @@ namespace Opus
     {
         private readonly DbService _db;
         private bool _isSigningIn;
-        private bool _dbReady;
         public Form1()
         {
             InitializeComponent();
@@ -29,53 +28,31 @@ namespace Opus
                 "Host=aws-1-ap-southeast-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.pozhzivlssyhcynpctiz;Password=plshelpmedead123;SSL Mode=Require;Trust Server Certificate=true;Timeout=5;Command Timeout=10";
             _db = new DbService(conn);
 
-            this.Load += Form1_Load;
         }
 
         // IMPORTANT STUFF BELOW, DO NOT TOUCH UNLESS YOU KNOW WHAT YOU ARE DOING
         private Point titleStart, underStart, panelStart;
-        private async void Form1_Load(object? sender, EventArgs e)
-        {
-            try
-            {
-                SignInButton.Enabled = false;
-                await _db.EnsureAccessTokensTableAsync();
-                _dbReady = true;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to initialize Access Tokens table.\n\n{ex.Message}", "Database!! Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                SignInButton.Enabled = true;
-            }
-        }
         //
         // METHODS
         //
         private async void SignInButton_Click(object sender, EventArgs e)
         {
             if (_isSigningIn) return;
-            if (!_dbReady)
-            {
-                MessageBox.Show("Database is still initializing. Please wait a moment and try again.", "Please Wait",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
 
             _isSigningIn = true;
             SignInButton.Enabled = false;
             string enteredCode = WhitelistBox.Text.Trim();
             AccessToken? matchedToken = null;
-;
+
             try
             {
-                //matchedToken = await _db.GetValidAccessTokenAsync(enteredCode);
+                // Fetch fresh server/cache state only when Sign In is clicked.
+                await _db.EnsureAccessTokensTableAsync();
+                matchedToken = await _db.GetValidAccessTokenAsync(enteredCode);
             }
             catch (Exception ex)
             {
+                if (IsDisposed) return;
                 MessageBox.Show($"Could not verify access token.\n\n{ex.Message}", "Database Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 SignInButton.StopActivity();
@@ -83,6 +60,7 @@ namespace Opus
                 SignInButton.Enabled = true;
                 return;
             }
+            if (IsDisposed) return;
             if (matchedToken != null)
             {
                 Logo.Anchor = AnchorStyles.None;
