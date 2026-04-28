@@ -25,6 +25,7 @@ namespace Opus
 
         private Action? _proceedAction;
         private Point? _customPosition;
+        private Size? _customSize;
 
         public Control? FocusedControl { get; private set; }
         public bool FocusEnabled { get; private set; }
@@ -35,17 +36,19 @@ namespace Opus
             string text,
             Control? focusedControl,
             bool focusEnabled = true,
-            Point? customPosition = null)
+            Point? customPosition = null,
+            Size? customSize = null)
         {
             FocusedControl = focusedControl;
             FocusEnabled = focusEnabled;
             _customPosition = customPosition;
+            _customSize = customSize;
 
-            Size = new Size(520, 240);
+            Size = customSize ?? new Size(760, 340);
             BackColor = Color.FromArgb(35, 35, 40);
             BorderStyle = BorderStyle.FixedSingle;
 
-            var imageSectionWidth = 280;
+            var imageSectionWidth = 320;
             var contentStartX = imageSectionWidth + 20;
 
 
@@ -64,7 +67,7 @@ namespace Opus
                 Font = new Font("Segoe UI", 16, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(contentStartX, 20),
-                Size = new Size(Width - contentStartX - DefaultMargin, 36),
+                Size = new Size(Width - contentStartX - DefaultMargin, 46),
                 BackColor = Color.Transparent
             };
 
@@ -73,8 +76,8 @@ namespace Opus
                 Text = text,
                 Font = new Font("Segoe UI", 10, FontStyle.Regular),
                 ForeColor = Color.Gainsboro,
-                Location = new Point(contentStartX, 64),
-                Size = new Size(Width - contentStartX - DefaultMargin, 105),
+                Location = new Point(contentStartX, 74),
+                Size = new Size(Width - contentStartX - DefaultMargin, 185),
                 BackColor = Color.Transparent
             };
 
@@ -104,10 +107,20 @@ namespace Opus
             _customPosition = customPosition;
             return this;
         }
-
+        public Popup WithSize(Size customSize)
+        {
+            _customSize = customSize;
+            Size = customSize;
+            return this;
+        }
         public void SetPosition(Point customPosition)
         {
             _customPosition = customPosition;
+        }
+        public void SetSize(Size customSize)
+        {
+            _customSize = customSize;
+            Size = customSize;
         }
         public void SetProceedAction(Action proceedAction)
         {
@@ -133,7 +146,7 @@ namespace Opus
                 ? ClampToHost(_customPosition.Value, host.ClientSize)
                 : new Point(
                     Math.Max(DefaultMargin, (host.ClientSize.Width - Width) / 2),
-                    Math.Max(DefaultMargin, host.ClientSize.Height - Height - DefaultMargin));
+                    Math.Max(DefaultMargin, (host.ClientSize.Height - Height) / 2));
         }
 
         public void ClosePopup()
