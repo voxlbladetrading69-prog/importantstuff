@@ -799,13 +799,72 @@ namespace Opus
             }
 
             _welcomePopupShown = true;
+            if (_accessToken?.ExpirationDateUtc != null)
+            {
+                ShowExpiringTokenTutorial();
+                return;
+            }
+        }
+
+        private void ShowExpiringTokenTutorial()
+        {
+            var tutorialSteps = new List<(string Title, string Body, Control FocusControl, bool FocusEnabled)>
+            {
+                (
+                    "Welcome to Bot Farming",
+                    "This dashboard helps you keep your farming setup stable, monitor account health, and react quickly when a run slows down.",
+                    HomePanel,
+                    false
+                ),
+                (
+                    "How the Game Loop Works",
+                    "In bot farming, accounts rotate through scripted actions to gather resources over time. Opus gives you a live view of that cycle so you can spot downtime early.",
+                    DevicesPanel,
+                    false
+                ),
+                (
+                    "Home Overview",
+                    "The Home tab gives you your high-level snapshot: active devices, account status, and quick health indicators.",
+                    HomeButton,
+                    true
+                ),
+                (
+                    "Devices Workspace",
+                    "Open Devices to drill into each machine, inspect account/package behavior, and review detailed analytics before making changes.",
+                    DevicesButton,
+                    true
+                ),
+                (
+                    "Settings & Access",
+                    "Use Settings for profile and startup preferences. You can also track your token expiry from the license section so you are never locked out unexpectedly.",
+                    SettingsButton,
+                    true
+                )
+            };
+
+            ShowTutorialStep(tutorialSteps, 0);
+        }
+
+        private void ShowTutorialStep(List<(string Title, string Body, Control FocusControl, bool FocusEnabled)> steps, int index)
+        {
+            if (index < 0 || index >= steps.Count)
+            {
+                return;
+            }
+
+            var step = steps[index];
             var popup = new Popup(
                 image: null,
-                title: "Hello",
-                text: $"Hello, {_welcomeUsername}! Welcome to Opus.",
-                focusedControl: HomePanel,
-                focusEnabled: false);
-            popup.WithProceedAction(() => popup.ClosePopup());
+                title: step.Title,
+                text: step.Body,
+                focusedControl: step.FocusControl,
+                focusEnabled: step.FocusEnabled);
+
+            popup.WithProceedAction(() =>
+            {
+                popup.ClosePopup();
+                ShowTutorialStep(steps, index + 1);
+            });
             popup.ShowOn(this);
         }
         private async Task InitializeFeedbackPanelAsync()
