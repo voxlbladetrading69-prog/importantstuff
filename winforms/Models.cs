@@ -26,4 +26,5 @@ public class FeedbackEntry
     public string Username { get; set; } = "";
     public string Content { get; set; } = "";
     public DateTime CreatedAtUtc { get; set; }
+    public bool IsFavorite { get; set; }
 }
