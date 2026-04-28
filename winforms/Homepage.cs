@@ -54,6 +54,9 @@ namespace Opus
         private readonly System.Windows.Forms.Timer _cachePollTimer;
         private readonly AccessToken? _accessToken;
         private readonly DbService _db;
+        private readonly List<FeedbackEntry> _feedbackEntries = new();
+        private readonly ContextMenuStrip _feedbackContextMenu = new();
+        private static bool _welcomePopupShown;
         //
         public Homepage(AccessToken? accessToken = null, DeviceCacheService? preloadedCacheService = null, bool initialConnectivityIssue = false)
         {
@@ -782,9 +785,28 @@ namespace Opus
             siticoneButtonAdvanced1.Click += AddDeviceButton_Click;
             FeedbackSubmitButton.Click += FeedbackSubmitButton_Click;
             FeedbackRefreshButton.Click += async (_, __) => await LoadFeedbackEntriesAsync();
+            ConfigureFeedbackContextMenu();
             _ = InitializeFeedbackPanelAsync();
+            ShowWelcomePopupIfNeeded();
             //Device newDevice2 = new Device("linging phone", 0, 5, "2 hours ago", Color.FromArgb(255, 128, 128));
             //DevicesFlowLayoutPanel.Controls.Add(newDevice2.DeviceButton);
+        }
+        private void ShowWelcomePopupIfNeeded()
+        {
+            if (_welcomePopupShown)
+            {
+                return;
+            }
+
+            _welcomePopupShown = true;
+            var popup = new Popup(
+                image: null,
+                title: "Hello",
+                text: $"Hello, {_welcomeUsername}! Welcome to Opus.",
+                focusedControl: HomePanel,
+                focusEnabled: false);
+            popup.WithProceedAction(() => popup.ClosePopup());
+            popup.ShowOn(this);
         }
         private async Task InitializeFeedbackPanelAsync()
         {
@@ -827,33 +849,36 @@ namespace Opus
 
         private void ApplyFeedbackModeUi()
         {
-            var canViewAll = _accessToken?.HasElevatedFeedbackAccess == true;
-            FeedbackInput.Enabled = !canViewAll;
-            FeedbackSubmitButton.Enabled = !canViewAll;
-            FeedbackInput.Visible = !canViewAll;
-            FeedbackSubmitButton.Visible = !canViewAll;
-            FeedbackModeLabel.Text = canViewAll
+            var isAdminToken = IsAdminToken();
+            FeedbackInput.Enabled = !isAdminToken;
+            FeedbackSubmitButton.Enabled = !isAdminToken;
+            FeedbackInput.Visible = !isAdminToken;
+            FeedbackSubmitButton.Visible = !isAdminToken;
+            FeedbackModeLabel.Text = isAdminToken
                 ? "Elevated access token detected: viewing all submitted feedback."
                 : "Submit product feedback below.";
         }
 
         private async Task LoadFeedbackEntriesAsync()
         {
-            var canViewAll = _accessToken?.HasElevatedFeedbackAccess == true;
-            var entries = canViewAll
+            var isAdminToken = IsAdminToken();
+            var entries = isAdminToken
                 ? await _db.GetFeedbackEntriesAsync()
                 : await _db.GetFeedbackEntriesByUsernameAsync(_welcomeUsername);
 
+            _feedbackEntries.Clear();
+            _feedbackEntries.AddRange(entries);
             FeedbackList.Items.Clear();
             foreach (var entry in entries)
             {
-                FeedbackList.Items.Add($"[{entry.CreatedAtUtc:yyyy-MM-dd HH:mm}] {entry.Username}: {entry.Content}");
+                var favoriteMarker = entry.IsFavorite ? "★ " : "";
+                FeedbackList.Items.Add($"{favoriteMarker}[{entry.CreatedAtUtc:yyyy-MM-dd HH:mm}] {entry.Username}: {entry.Content}");
             }
         }
 
         private async void FeedbackSubmitButton_Click(object? sender, EventArgs e)
         {
-            if (_accessToken?.HasElevatedFeedbackAccess == true)
+            if (IsAdminToken())
             {
                 return;
             }
@@ -867,6 +892,7 @@ namespace Opus
 
             try
             {
+                FeedbackSubmitButton.Enabled = false;
                 await _db.SubmitFeedbackAsync(_welcomeUsername, message);
                 FeedbackInput.TextContent = string.Empty;
                 await LoadFeedbackEntriesAsync();
@@ -875,6 +901,99 @@ namespace Opus
             {
                 MessageBox.Show("Could not submit feedback right now.", "Connection issue", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+            finally
+            {
+                FeedbackSubmitButton.Enabled = true;
+            }
+        }
+
+        private bool IsAdminToken() => _accessToken != null && _accessToken.ExpirationDateUtc == null;
+
+        private void ConfigureFeedbackContextMenu()
+        {
+            var favoriteItem = new ToolStripMenuItem("Toggle Favorite");
+            favoriteItem.Click += async (_, __) => await ToggleSelectedFeedbackFavoriteAsync();
+            var deleteItem = new ToolStripMenuItem("Delete");
+            deleteItem.Click += async (_, __) => await DeleteSelectedFeedbackAsync();
+
+            _feedbackContextMenu.Items.Add(favoriteItem);
+            _feedbackContextMenu.Items.Add(deleteItem);
+            FeedbackList.ContextMenuStrip = _feedbackContextMenu;
+            FeedbackList.MouseDown += FeedbackList_MouseDown;
+        }
+
+        private void FeedbackList_MouseDown(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right)
+            {
+                return;
+            }
+
+            var index = FeedbackList.IndexFromPoint(e.Location);
+            if (index >= 0)
+            {
+                FeedbackList.SelectedIndex = index;
+            }
+        }
+
+        private async Task ToggleSelectedFeedbackFavoriteAsync()
+        {
+            var selected = GetSelectedFeedbackEntry();
+            if (selected == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await _db.SetFeedbackFavoriteAsync(selected.Id, !selected.IsFavorite);
+                await LoadFeedbackEntriesAsync();
+            }
+            catch
+            {
+                MessageBox.Show("Could not update favorite status right now.", "Connection issue", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private async Task DeleteSelectedFeedbackAsync()
+        {
+            var selected = GetSelectedFeedbackEntry();
+            if (selected == null)
+            {
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                "Are you sure you want to delete this feedback?",
+                "Delete feedback",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (confirm != DialogResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                await _db.DeleteFeedbackAsync(selected.Id);
+                await LoadFeedbackEntriesAsync();
+            }
+            catch
+            {
+                MessageBox.Show("Could not delete feedback right now.", "Connection issue", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private FeedbackEntry? GetSelectedFeedbackEntry()
+        {
+            var index = FeedbackList.SelectedIndex;
+            if (index < 0 || index >= _feedbackEntries.Count)
+            {
+                return null;
+            }
+
+            return _feedbackEntries[index];
         }
         private void BackToDevicesButton_Click(object? sender, EventArgs e)
         {
