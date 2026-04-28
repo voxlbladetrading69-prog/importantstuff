@@ -52,14 +52,18 @@ namespace Opus
         private readonly bool _cachePreloaded;
         private readonly bool _initialConnectivityIssue;
         private readonly System.Windows.Forms.Timer _cachePollTimer;
+        private readonly AccessToken? _accessToken;
+        private readonly DbService _db;
         //
-        public Homepage(string? welcomeUsername = null, DeviceCacheService? preloadedCacheService = null, bool initialConnectivityIssue = false)
+        public Homepage(AccessToken? accessToken = null, DeviceCacheService? preloadedCacheService = null, bool initialConnectivityIssue = false)
         {
             InitializeComponent();
             HideSubDashboardHorizontalScrollBar();
-            _welcomeUsername = string.IsNullOrWhiteSpace(welcomeUsername) ? "User" : welcomeUsername.Trim();
+            _accessToken = accessToken;
+            _welcomeUsername = string.IsNullOrWhiteSpace(accessToken?.Username) ? "User" : accessToken!.Username.Trim();
             HomeLabel1.Text = $"Welcome back, {_welcomeUsername} !";
             _cacheService = preloadedCacheService ?? new DeviceCacheService(_conn);
+            _db = new DbService(_conn);
             _cachePreloaded = preloadedCacheService != null;
             _initialConnectivityIssue = initialConnectivityIssue;
             _cachePollTimer = new System.Windows.Forms.Timer { Interval = 60_000 };
@@ -776,8 +780,101 @@ namespace Opus
             BackToDevicesButton.Click += BackToDevicesButton_Click;
             PositionStatsCards();
             siticoneButtonAdvanced1.Click += AddDeviceButton_Click;
+            FeedbackSubmitButton.Click += FeedbackSubmitButton_Click;
+            FeedbackRefreshButton.Click += async (_, __) => await LoadFeedbackEntriesAsync();
+            _ = InitializeFeedbackPanelAsync();
             //Device newDevice2 = new Device("linging phone", 0, 5, "2 hours ago", Color.FromArgb(255, 128, 128));
             //DevicesFlowLayoutPanel.Controls.Add(newDevice2.DeviceButton);
+        }
+        private async Task InitializeFeedbackPanelAsync()
+        {
+            try
+            {
+                await _db.EnsureAccessTokensTableAsync();
+                await _db.EnsureAccessTokenPermissionsAsync();
+                await _db.EnsureFeedbackTableAsync();
+                ApplyLicenseStatusFromToken();
+                ApplyFeedbackModeUi();
+                await LoadFeedbackEntriesAsync();
+            }
+            catch
+            {
+                FeedbackModeLabel.Text = "Feedback service unavailable.";
+            }
+        }
+
+        private void ApplyLicenseStatusFromToken()
+        {
+            if (_accessToken == null)
+            {
+                LicenseStatus.Text = "UNKNOWN";
+                LicenseDuration.Text = "No access token information.";
+                return;
+            }
+
+            if (_accessToken.ExpirationDateUtc == null)
+            {
+                LicenseStatus.Text = _accessToken.HasElevatedFeedbackAccess ? "ADMIN" : "ACTIVE";
+                LicenseDuration.Text = _accessToken.HasElevatedFeedbackAccess
+                    ? "No expiry (elevated token)"
+                    : "No expiry";
+                return;
+            }
+
+            LicenseStatus.Text = "ACTIVE";
+            LicenseDuration.Text = $"Expires: {_accessToken.ExpirationDateUtc.Value:yyyy-MM-dd HH:mm} UTC";
+        }
+
+        private void ApplyFeedbackModeUi()
+        {
+            var canViewAll = _accessToken?.HasElevatedFeedbackAccess == true;
+            FeedbackInput.Enabled = !canViewAll;
+            FeedbackSubmitButton.Enabled = !canViewAll;
+            FeedbackInput.Visible = !canViewAll;
+            FeedbackSubmitButton.Visible = !canViewAll;
+            FeedbackModeLabel.Text = canViewAll
+                ? "Elevated access token detected: viewing all submitted feedback."
+                : "Submit product feedback below.";
+        }
+
+        private async Task LoadFeedbackEntriesAsync()
+        {
+            var canViewAll = _accessToken?.HasElevatedFeedbackAccess == true;
+            var entries = canViewAll
+                ? await _db.GetFeedbackEntriesAsync()
+                : await _db.GetFeedbackEntriesByUsernameAsync(_welcomeUsername);
+
+            FeedbackList.Items.Clear();
+            foreach (var entry in entries)
+            {
+                FeedbackList.Items.Add($"[{entry.CreatedAtUtc:yyyy-MM-dd HH:mm}] {entry.Username}: {entry.Content}");
+            }
+        }
+
+        private async void FeedbackSubmitButton_Click(object? sender, EventArgs e)
+        {
+            if (_accessToken?.HasElevatedFeedbackAccess == true)
+            {
+                return;
+            }
+
+            var message = FeedbackInput.TextContent.Trim();
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                MessageBox.Show("Please enter feedback before submitting.", "Feedback", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                await _db.SubmitFeedbackAsync(_welcomeUsername, message);
+                FeedbackInput.TextContent = string.Empty;
+                await LoadFeedbackEntriesAsync();
+            }
+            catch
+            {
+                MessageBox.Show("Could not submit feedback right now.", "Connection issue", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
         private void BackToDevicesButton_Click(object? sender, EventArgs e)
         {
