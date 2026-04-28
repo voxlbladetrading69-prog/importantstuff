@@ -155,10 +155,10 @@ namespace Opus
             CurrentHiveTitle = new SiticoneNetCoreUI.SiticoneLabel();
             CurrentHiveValue = new SiticoneNetCoreUI.SiticoneLabel();
             HoneyGraphPanel = new SiticoneNetCoreUI.SiticoneAdvancedPanel();
-            AnalyticsRange24HButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
-            AnalyticsRange7DButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
-            AnalyticsRange30DButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
             HoneyGraphTitle = new SiticoneNetCoreUI.SiticoneLabel();
+            AnalyticsRange30DButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
+            AnalyticsRange7DButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
+            AnalyticsRange24HButton = new SiticoneNetCoreUI.SiticoneTextButtonAdvanced();
             HoneyChart = new LiveChartsCore.SkiaSharpView.WinForms.CartesianChart();
             HiveSizePanel = new SiticoneNetCoreUI.SiticoneAdvancedPanel();
             cartesianChart1 = new LiveChartsCore.SkiaSharpView.WinForms.CartesianChart();
@@ -1605,11 +1605,11 @@ namespace Opus
             DashboardHolder.BackgroundImageOpacity = 1F;
             DashboardHolder.BackgroundImageSizeMode = SiticoneNetCoreUI.SiticoneAdvancedPanel.ImageSizeModeEx.Stretch;
             DashboardHolder.BackgroundOverlayColor = Color.FromArgb(0, 0, 0, 0);
-            DashboardHolder.BorderColor = Color.FromArgb(32, 35, 53);
+            DashboardHolder.BorderColor = Color.FromArgb(64, 64, 64);
             DashboardHolder.BorderDashPattern = null;
             DashboardHolder.BorderGlowColor = Color.FromArgb(128, 128, 255);
             DashboardHolder.BorderGlowSize = 3F;
-            DashboardHolder.BorderWidth = 0F;
+            DashboardHolder.BorderWidth = 1F;
             DashboardHolder.BottomLeftRadius = 0;
             DashboardHolder.BottomRightRadius = 0;
             DashboardHolder.ContentAlignmentCustom = ContentAlignment.MiddleCenter;
@@ -2903,53 +2903,16 @@ namespace Opus
             HoneyGraphPanel.TopLeftRadius = 8;
             HoneyGraphPanel.TopRightRadius = 8;
             // 
-            // AnalyticsRange24HButton
+            // HoneyGraphTitle
             // 
-            AnalyticsRange24HButton.BackColor = Color.Transparent;
-            AnalyticsRange24HButton.DisabledTextColor = Color.FromArgb(120, 120, 120);
-            AnalyticsRange24HButton.EnablePressAnimation = false;
-            AnalyticsRange24HButton.EnableRippleEffect = false;
-            AnalyticsRange24HButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            AnalyticsRange24HButton.HoverAnimationSpeed = 5F;
-            AnalyticsRange24HButton.HoverShowUnderline = false;
-            AnalyticsRange24HButton.HoverTextColor = Color.White;
-            AnalyticsRange24HButton.IconSize = new Size(16, 16);
-            AnalyticsRange24HButton.Location = new Point(392, 12);
-            AnalyticsRange24HButton.Margin = new Padding(0);
-            AnalyticsRange24HButton.Name = "AnalyticsRange24HButton";
-            AnalyticsRange24HButton.PressedTextColor = Color.White;
-            AnalyticsRange24HButton.RippleColor = Color.FromArgb(100, 0, 123, 255);
-            AnalyticsRange24HButton.Size = new Size(48, 24);
-            AnalyticsRange24HButton.TabIndex = 2;
-            AnalyticsRange24HButton.Text = "24H";
-            AnalyticsRange24HButton.TextColor = Color.White;
-            AnalyticsRange24HButton.TextGradientColor1 = Color.FromArgb(34, 153, 186);
-            AnalyticsRange24HButton.TextGradientColor2 = Color.FromArgb(20, 108, 148);
-            AnalyticsRange24HButton.UnderlineColor = Color.FromArgb(34, 153, 186);
-            // 
-            // AnalyticsRange7DButton
-            // 
-            AnalyticsRange7DButton.BackColor = Color.Transparent;
-            AnalyticsRange7DButton.DisabledTextColor = Color.FromArgb(120, 120, 120);
-            AnalyticsRange7DButton.EnablePressAnimation = false;
-            AnalyticsRange7DButton.EnableRippleEffect = false;
-            AnalyticsRange7DButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            AnalyticsRange7DButton.HoverAnimationSpeed = 5F;
-            AnalyticsRange7DButton.HoverShowUnderline = false;
-            AnalyticsRange7DButton.HoverTextColor = Color.White;
-            AnalyticsRange7DButton.IconSize = new Size(16, 16);
-            AnalyticsRange7DButton.Location = new Point(448, 12);
-            AnalyticsRange7DButton.Margin = new Padding(0);
-            AnalyticsRange7DButton.Name = "AnalyticsRange7DButton";
-            AnalyticsRange7DButton.PressedTextColor = Color.White;
-            AnalyticsRange7DButton.RippleColor = Color.FromArgb(100, 0, 123, 255);
-            AnalyticsRange7DButton.Size = new Size(40, 24);
-            AnalyticsRange7DButton.TabIndex = 3;
-            AnalyticsRange7DButton.Text = "7D";
-            AnalyticsRange7DButton.TextColor = Color.DarkGray;
-            AnalyticsRange7DButton.TextGradientColor1 = Color.FromArgb(34, 153, 186);
-            AnalyticsRange7DButton.TextGradientColor2 = Color.FromArgb(20, 108, 148);
-            AnalyticsRange7DButton.UnderlineColor = Color.FromArgb(34, 153, 186);
+            HoneyGraphTitle.BackColor = Color.Transparent;
+            HoneyGraphTitle.Font = new Font("Segoe UI", 16F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            HoneyGraphTitle.ForeColor = Color.White;
+            HoneyGraphTitle.Location = new Point(16, 10);
+            HoneyGraphTitle.Name = "HoneyGraphTitle";
+            HoneyGraphTitle.Size = new Size(220, 30);
+            HoneyGraphTitle.TabIndex = 0;
+            HoneyGraphTitle.Text = "Honey Over Time";
             // 
             // AnalyticsRange30DButton
             // 
@@ -2957,7 +2920,6 @@ namespace Opus
             AnalyticsRange30DButton.DisabledTextColor = Color.FromArgb(120, 120, 120);
             AnalyticsRange30DButton.EnablePressAnimation = false;
             AnalyticsRange30DButton.EnableRippleEffect = false;
-            AnalyticsRange30DButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             AnalyticsRange30DButton.HoverAnimationSpeed = 5F;
             AnalyticsRange30DButton.HoverShowUnderline = false;
             AnalyticsRange30DButton.HoverTextColor = Color.White;
@@ -2975,16 +2937,51 @@ namespace Opus
             AnalyticsRange30DButton.TextGradientColor2 = Color.FromArgb(20, 108, 148);
             AnalyticsRange30DButton.UnderlineColor = Color.FromArgb(34, 153, 186);
             // 
-            // HoneyGraphTitle
+            // AnalyticsRange7DButton
             // 
-            HoneyGraphTitle.BackColor = Color.Transparent;
-            HoneyGraphTitle.Font = new Font("Segoe UI", 16F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            HoneyGraphTitle.ForeColor = Color.White;
-            HoneyGraphTitle.Location = new Point(16, 10);
-            HoneyGraphTitle.Name = "HoneyGraphTitle";
-            HoneyGraphTitle.Size = new Size(220, 30);
-            HoneyGraphTitle.TabIndex = 0;
-            HoneyGraphTitle.Text = "Honey Over Time";
+            AnalyticsRange7DButton.BackColor = Color.Transparent;
+            AnalyticsRange7DButton.DisabledTextColor = Color.FromArgb(120, 120, 120);
+            AnalyticsRange7DButton.EnablePressAnimation = false;
+            AnalyticsRange7DButton.EnableRippleEffect = false;
+            AnalyticsRange7DButton.HoverAnimationSpeed = 5F;
+            AnalyticsRange7DButton.HoverShowUnderline = false;
+            AnalyticsRange7DButton.HoverTextColor = Color.White;
+            AnalyticsRange7DButton.IconSize = new Size(16, 16);
+            AnalyticsRange7DButton.Location = new Point(448, 12);
+            AnalyticsRange7DButton.Margin = new Padding(0);
+            AnalyticsRange7DButton.Name = "AnalyticsRange7DButton";
+            AnalyticsRange7DButton.PressedTextColor = Color.White;
+            AnalyticsRange7DButton.RippleColor = Color.FromArgb(100, 0, 123, 255);
+            AnalyticsRange7DButton.Size = new Size(40, 24);
+            AnalyticsRange7DButton.TabIndex = 3;
+            AnalyticsRange7DButton.Text = "7D";
+            AnalyticsRange7DButton.TextColor = Color.DarkGray;
+            AnalyticsRange7DButton.TextGradientColor1 = Color.FromArgb(34, 153, 186);
+            AnalyticsRange7DButton.TextGradientColor2 = Color.FromArgb(20, 108, 148);
+            AnalyticsRange7DButton.UnderlineColor = Color.FromArgb(34, 153, 186);
+            // 
+            // AnalyticsRange24HButton
+            // 
+            AnalyticsRange24HButton.BackColor = Color.Transparent;
+            AnalyticsRange24HButton.DisabledTextColor = Color.FromArgb(120, 120, 120);
+            AnalyticsRange24HButton.EnablePressAnimation = false;
+            AnalyticsRange24HButton.EnableRippleEffect = false;
+            AnalyticsRange24HButton.HoverAnimationSpeed = 5F;
+            AnalyticsRange24HButton.HoverShowUnderline = false;
+            AnalyticsRange24HButton.HoverTextColor = Color.White;
+            AnalyticsRange24HButton.IconSize = new Size(16, 16);
+            AnalyticsRange24HButton.Location = new Point(392, 12);
+            AnalyticsRange24HButton.Margin = new Padding(0);
+            AnalyticsRange24HButton.Name = "AnalyticsRange24HButton";
+            AnalyticsRange24HButton.PressedTextColor = Color.White;
+            AnalyticsRange24HButton.RippleColor = Color.FromArgb(100, 0, 123, 255);
+            AnalyticsRange24HButton.Size = new Size(48, 24);
+            AnalyticsRange24HButton.TabIndex = 2;
+            AnalyticsRange24HButton.Text = "24H";
+            AnalyticsRange24HButton.TextColor = Color.White;
+            AnalyticsRange24HButton.TextGradientColor1 = Color.FromArgb(34, 153, 186);
+            AnalyticsRange24HButton.TextGradientColor2 = Color.FromArgb(20, 108, 148);
+            AnalyticsRange24HButton.UnderlineColor = Color.FromArgb(34, 153, 186);
             // 
             // HoneyChart
             // 
@@ -5357,11 +5354,11 @@ namespace Opus
             SubDashboard.BackgroundImageOpacity = 1F;
             SubDashboard.BackgroundImageSizeMode = SiticoneNetCoreUI.SiticoneAdvancedPanel.ImageSizeModeEx.Stretch;
             SubDashboard.BackgroundOverlayColor = Color.FromArgb(0, 0, 0, 0);
-            SubDashboard.BorderColor = Color.FromArgb(32, 35, 53);
+            SubDashboard.BorderColor = Color.FromArgb(64, 64, 64);
             SubDashboard.BorderDashPattern = null;
             SubDashboard.BorderGlowColor = Color.FromArgb(128, 128, 255);
             SubDashboard.BorderGlowSize = 3F;
-            SubDashboard.BorderWidth = 0F;
+            SubDashboard.BorderWidth = 1F;
             SubDashboard.BottomLeftRadius = 0;
             SubDashboard.BottomRightRadius = 0;
             SubDashboard.ContentAlignmentCustom = ContentAlignment.MiddleCenter;
@@ -5430,10 +5427,10 @@ namespace Opus
             sContainer.Controls.Add(DeviceOverview);
             sContainer.Controls.Add(PlaceholderAccount);
             sContainer.FlowDirection = FlowDirection.TopDown;
-            sContainer.Location = new Point(0, 61);
+            sContainer.Location = new Point(1, 61);
             sContainer.Margin = new Padding(0);
             sContainer.Name = "sContainer";
-            sContainer.Size = new Size(200, 514);
+            sContainer.Size = new Size(198, 514);
             sContainer.TabIndex = 1;
             sContainer.WrapContents = false;
             // 
@@ -5532,8 +5529,8 @@ namespace Opus
             Controls.Add(closeButton);
             Controls.Add(maxButton);
             Controls.Add(minButton);
-            Controls.Add(SubDashboard);
             Controls.Add(DashboardHolder);
+            Controls.Add(SubDashboard);
             FormBorderStyle = FormBorderStyle.None;
             Name = "Homepage";
             Padding = new Padding(1);
