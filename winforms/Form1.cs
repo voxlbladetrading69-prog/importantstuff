@@ -13,6 +13,7 @@ namespace Opus
     public partial class Form1 : Form
     {
         private readonly DbService _db;
+        private readonly string _conn;
         private bool _isSigningIn;
         public Form1()
         {
@@ -24,7 +25,7 @@ namespace Opus
             this.UpdateStyles();
             this.MouseDown += FormDrag_MouseDown;
             SignInButton.Click += SignInButton_Click;
-            const string conn =
+            _conn =
     "Host=aws-1-ap-southeast-2.pooler.supabase.com;" +
     "Port=6543;" +
     "Database=postgres;" +
@@ -35,7 +36,7 @@ namespace Opus
     "Timeout=5;" +
     "Command Timeout=10;" +
     "Pooling=false;";
-            _db = new DbService(conn);
+            _db = new DbService(_conn);
 
         }
 
@@ -50,7 +51,6 @@ namespace Opus
 
             _isSigningIn = true;
             SignInButton.StartActivity();
-            SignInButton.Enabled = false;
             string enteredCode = WhitelistBox.Text.Trim();
             AccessToken? matchedToken = null;
 
@@ -60,11 +60,11 @@ namespace Opus
                 await _db.EnsureAccessTokensTableAsync();
                 matchedToken = await _db.GetValidAccessTokenAsync(enteredCode);
             }
-            catch (Exception ex)
+            catch
             {
                 if (IsDisposed) return;
-                MessageBox.Show($"Could not verify access token.\n\n{ex.Message}", "Database Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Slow internet connection.", "Connection issue",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 SignInButton.StopActivity();
                 _isSigningIn = false;
                 SignInButton.Enabled = true;
@@ -73,6 +73,18 @@ namespace Opus
             if (IsDisposed) return;
             if (matchedToken != null)
             {
+                DeviceCacheService? preloadedCache = null;
+                var isPreloadUnavailable = false;
+                try
+                {
+                    preloadedCache = new DeviceCacheService(_conn);
+                    await preloadedCache.InitializeAsync();
+                }
+                catch
+                {
+                    isPreloadUnavailable = true;
+                }
+
                 Logo.Anchor = AnchorStyles.None;
                 this.Region = null;
                 // Move title up
@@ -189,7 +201,7 @@ namespace Opus
                 await Task.Delay(460);
 
                 // Open homepage in same place
-                Homepage home = new Homepage(matchedToken.Username);
+                Homepage home = new Homepage(matchedToken.Username, preloadedCache, isPreloadUnavailable);
                 home.StartPosition = FormStartPosition.Manual;
                 home.Location = this.Location;
                 home.Opacity = 0;
