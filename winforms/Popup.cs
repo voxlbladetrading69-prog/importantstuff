@@ -11,6 +11,8 @@ namespace Opus
     /// </summary>
     public class Popup : Panel
     {
+        private const int DefaultMargin = 20;
+
         private readonly PictureBox _imageBox;
         private readonly SiticoneLabel _titleLabel;
         private readonly SiticoneLabel _textLabel;
@@ -22,26 +24,38 @@ namespace Opus
         private readonly Panel _focusBottom = CreateFocusPanel();
 
         private Action? _proceedAction;
+        private Point? _customPosition;
 
         public Control? FocusedControl { get; private set; }
         public bool FocusEnabled { get; private set; }
 
-        public Popup(Image? image, string title, string text, Control? focusedControl, bool focusEnabled = true)
+        public Popup(
+            Image? image,
+            string title,
+            string text,
+            Control? focusedControl,
+            bool focusEnabled = true,
+            Point? customPosition = null)
         {
             FocusedControl = focusedControl;
             FocusEnabled = focusEnabled;
+            _customPosition = customPosition;
 
             Size = new Size(520, 240);
             BackColor = Color.FromArgb(35, 35, 40);
             BorderStyle = BorderStyle.FixedSingle;
 
+            var imageSectionWidth = 280;
+            var contentStartX = imageSectionWidth + 20;
+
+
             _imageBox = new PictureBox
             {
                 Image = image,
                 SizeMode = PictureBoxSizeMode.Zoom,
-                Location = new Point(20, 20),
-                Size = new Size(84, 84),
-                BackColor = Color.Transparent
+                Location = new Point(DefaultMargin, DefaultMargin),
+                Size = new Size(imageSectionWidth - (DefaultMargin * 2), Height - (DefaultMargin * 2)),
+                BackColor = Color.FromArgb(28, 28, 32)
             };
 
             _titleLabel = new SiticoneLabel
@@ -49,8 +63,8 @@ namespace Opus
                 Text = title,
                 Font = new Font("Segoe UI", 16, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(120, 20),
-                Size = new Size(380, 36),
+                Location = new Point(contentStartX, 20),
+                Size = new Size(Width - contentStartX - DefaultMargin, 36),
                 BackColor = Color.Transparent
             };
 
@@ -59,8 +73,8 @@ namespace Opus
                 Text = text,
                 Font = new Font("Segoe UI", 10, FontStyle.Regular),
                 ForeColor = Color.Gainsboro,
-                Location = new Point(120, 64),
-                Size = new Size(370, 105),
+                Location = new Point(contentStartX, 64),
+                Size = new Size(Width - contentStartX - DefaultMargin, 105),
                 BackColor = Color.Transparent
             };
 
@@ -68,8 +82,8 @@ namespace Opus
             {
                 Text = "Proceed",
                 Size = new Size(110, 36),
-                Location = new Point(380, 185),
-                BackColor = Color.FromArgb(34, 153, 186),
+                Location = new Point(Width - 110 - DefaultMargin, Height - 36 - DefaultMargin),
+                BackColor = Color.FromArgb(35, 35, 40),
                 ForeColor = Color.White
             };
             _proceedButton.Click += (_, __) => _proceedAction?.Invoke();
@@ -85,7 +99,16 @@ namespace Opus
             _proceedAction = proceedAction;
             return this;
         }
+        public Popup WithPosition(Point customPosition)
+        {
+            _customPosition = customPosition;
+            return this;
+        }
 
+        public void SetPosition(Point customPosition)
+        {
+            _customPosition = customPosition;
+        }
         public void SetProceedAction(Action proceedAction)
         {
             _proceedAction = proceedAction;
@@ -106,9 +129,11 @@ namespace Opus
             }
 
             BringToFront();
-            Location = new Point(
-                Math.Max(20, (host.ClientSize.Width - Width) / 2),
-                Math.Max(20, host.ClientSize.Height - Height - 20));
+            Location = _customPosition.HasValue
+                ? ClampToHost(_customPosition.Value, host.ClientSize)
+                : new Point(
+                    Math.Max(DefaultMargin, (host.ClientSize.Width - Width) / 2),
+                    Math.Max(DefaultMargin, host.ClientSize.Height - Height - DefaultMargin));
         }
 
         public void ClosePopup()
@@ -176,6 +201,14 @@ namespace Opus
             {
                 panel.Parent.Controls.Remove(panel);
             }
+        }
+        private Point ClampToHost(Point requestedPosition, Size hostSize)
+        {
+            var maxX = Math.Max(DefaultMargin, hostSize.Width - Width - DefaultMargin);
+            var maxY = Math.Max(DefaultMargin, hostSize.Height - Height - DefaultMargin);
+            var x = Math.Max(DefaultMargin, Math.Min(requestedPosition.X, maxX));
+            var y = Math.Max(DefaultMargin, Math.Min(requestedPosition.Y, maxY));
+            return new Point(x, y);
         }
     }
 }
