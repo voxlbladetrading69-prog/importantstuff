@@ -47,6 +47,7 @@ namespace Opus
             Size = customSize ?? new Size(760, 340);
             BackColor = Color.FromArgb(35, 35, 40);
             BorderStyle = BorderStyle.FixedSingle;
+            DoubleBuffered = true;
 
             var imageSectionWidth = 320;
             var contentStartX = imageSectionWidth + 20;
@@ -190,8 +191,7 @@ namespace Opus
             _focusLeft.Bounds = new Rectangle(0, focusRect.Top, Math.Max(0, focusRect.Left), Math.Max(0, focusRect.Height));
             _focusRight.Bounds = new Rectangle(Math.Min(w, focusRect.Right), focusRect.Top, Math.Max(0, w - focusRect.Right), Math.Max(0, focusRect.Height));
             _focusBottom.Bounds = new Rectangle(0, Math.Min(h, focusRect.Bottom), w, Math.Max(0, h - focusRect.Bottom));
-
-            target.BringToFront();
+                
         }
 
         private void RemoveFocusEffect()
@@ -202,8 +202,20 @@ namespace Opus
             RemovePanel(_focusBottom);
         }
 
+        private sealed class FocusOverlayPanel : Panel
+        {
+            public FocusOverlayPanel()
+            {
+                DoubleBuffered = true;
+                SetStyle(ControlStyles.AllPaintingInWmPaint |
+                         ControlStyles.UserPaint |
+                         ControlStyles.OptimizedDoubleBuffer, true);
+                UpdateStyles();
+            }
+        }
+
         private static Panel CreateFocusPanel()
-            => new Panel
+            => new FocusOverlayPanel
             {
                 BackColor = Color.FromArgb(140, 0, 0, 0)
             };
