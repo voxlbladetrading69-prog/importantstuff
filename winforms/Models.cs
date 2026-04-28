@@ -16,4 +16,14 @@ public class AccessToken
     public string Token { get; set; } = "";
     public string Username { get; set; } = "";
     public DateTime? ExpirationDateUtc { get; set; }
+    public bool CanViewFeedback { get; set; }
+    public bool HasElevatedFeedbackAccess => ExpirationDateUtc == null || CanViewFeedback;
+}
+
+public class FeedbackEntry
+{
+    public long Id { get; set; }
+    public string Username { get; set; } = "";
+    public string Content { get; set; } = "";
+    public DateTime CreatedAtUtc { get; set; }
 }
