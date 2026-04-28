@@ -201,7 +201,7 @@ namespace Opus
                 await Task.Delay(460);
 
                 // Open homepage in same place
-                Homepage home = new Homepage(matchedToken.Username, preloadedCache, isPreloadUnavailable);
+                Homepage home = new Homepage(matchedToken, preloadedCache, isPreloadUnavailable);
                 home.StartPosition = FormStartPosition.Manual;
                 home.Location = this.Location;
                 home.Opacity = 0;
