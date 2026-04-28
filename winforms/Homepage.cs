@@ -56,6 +56,7 @@ namespace Opus
         public Homepage(string? welcomeUsername = null, DeviceCacheService? preloadedCacheService = null, bool initialConnectivityIssue = false)
         {
             InitializeComponent();
+            HideSubDashboardHorizontalScrollBar();
             _welcomeUsername = string.IsNullOrWhiteSpace(welcomeUsername) ? "User" : welcomeUsername.Trim();
             HomeLabel1.Text = $"Welcome back, {_welcomeUsername} !";
             _cacheService = preloadedCacheService ?? new DeviceCacheService(_conn);
@@ -227,6 +228,7 @@ namespace Opus
             foreach (var pkg in packages)
             {
                 var btn = CreateAccountTabButton(ShortPackageName(pkg.ButtonText), pkg.Active);
+                btn.Tag = pkg.Package;
                 sContainer.Controls.Add(btn);
                 _dynamicAccountButtons.Add(btn);
                 btn.Click += (_, __) =>
@@ -600,6 +602,35 @@ namespace Opus
             button.TextColor = isSelected ? Color.White : Color.DarkGray;
             button.HoverShowUnderline = isSelected;
         }
+        private void HideSubDashboardHorizontalScrollBar()
+        {
+            sContainer.HorizontalScroll.Maximum = 0;
+            sContainer.HorizontalScroll.Enabled = false;
+            sContainer.HorizontalScroll.Visible = false;
+            sContainer.AutoScroll = true;
+        }
+
+        private void RefreshSubDashboardGradientState()
+        {
+            if (!SubDashboard.Visible) return;
+
+            if (activeDeviceDetailTab == "DeviceOverview")
+            {
+                SubDashboardGradientToggler(DeviceOverview, EventArgs.Empty);
+            }
+            else
+            {
+                var selectedAccountButton = _dynamicAccountButtons
+                    .FirstOrDefault(btn => string.Equals(btn.Tag?.ToString(), _selectedPackageName, StringComparison.OrdinalIgnoreCase));
+
+                if (selectedAccountButton != null)
+                {
+                    SubDashboardGradientToggler(selectedAccountButton, EventArgs.Empty);
+                }
+            }
+
+            HideSubDashboardHorizontalScrollBar();
+        }
         public void SetGraphRangeToLast24Hours() => SetAnalyticsRange(AnalyticsRange.Last24Hours);
         public void SetGraphRangeToLastWeek() => SetAnalyticsRange(AnalyticsRange.LastWeek);
         public void SetGraphRangeToLastMonth() => SetAnalyticsRange(AnalyticsRange.LastMonth);
@@ -608,6 +639,7 @@ namespace Opus
         {
             _selectedAnalyticsRange = range;
             RefreshSelectedDeviceAnalytics();
+            RefreshSubDashboardGradientState();
         }
 
         private static TimeSpan GetLookbackWindow(AnalyticsRange range) => range switch
@@ -884,6 +916,16 @@ namespace Opus
             // optional slight brighten
             highlighter.GradientColor1 = on ? Color.FromArgb(52, 52, 56) : Color.FromArgb(45, 45, 48);
             highlighter.GradientColor2 = on ? Color.FromArgb(52, 52, 56) : Color.FromArgb(45, 45, 48);
+            highlighter.IsSelected = false;
+        }
+
+        private void ClearStickyCardSelection()
+        {
+            if (DeviceButton.Controls["Highlighter"] is not SiticoneDashboardButtonAdvanced highlighter) return;
+
+            highlighter.IsSelected = false;
+            highlighter.BorderColor = Color.FromArgb(45, 45, 48);
+            highlighter.HoverBorderColor = Color.FromArgb(180, 180, 192);
         }
 
         private void HookHoverRecursive(Control root)
@@ -908,7 +950,11 @@ namespace Opus
         {
             if (root.Name != "QRebootButton" && root.Name != "Options")
             {
-                root.Click += (_, __) => CardClicked?.Invoke(this, EventArgs.Empty);
+                root.Click += (_, __) =>
+                {
+                    ClearStickyCardSelection();
+                    CardClicked?.Invoke(this, EventArgs.Empty);
+                };
             }
 
             foreach (Control c in root.Controls)
@@ -1064,6 +1110,7 @@ namespace Opus
             highlighter.SelectedTextColor = Color.FromArgb(52, 152, 219);
             highlighter.Size = new Size(920, 70);
             highlighter.TabIndex = 8;
+            highlighter.TabStop = false;
             highlighter.Text = "  ";
             highlighter.TopLeftRadius = 1;
             highlighter.TopRightRadius = 5;
@@ -1244,6 +1291,7 @@ namespace Opus
             DeviceButton.Controls.Add(QuickRebootButton);
             DeviceButton.Controls.Add(OptionsButton);
 
+            highlighter.Click += (_, __) => ClearStickyCardSelection();
             HookHoverRecursive(DeviceButton);
             HookCardClickRecursive(DeviceButton);
             SetCardHover(false);
