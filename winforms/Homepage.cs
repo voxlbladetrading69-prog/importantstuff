@@ -415,16 +415,31 @@ namespace Opus
             AccountDetailsStatus.Text = active ? "● Active" : "● Inactive";
             AccountDetailsStatus.ForeColor = active ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
 
-            var cutoffUtc = DateTime.UtcNow - GetLookbackWindow(_selectedAnalyticsRange);
-            var points = account.MetricTimeline
-                .Where(p => p.EventTimeUtc >= cutoffUtc)
+            var orderedTimeline = account.MetricTimeline
                 .OrderBy(p => p.EventTimeUtc)
+                .ToList();
+
+            var latestPoint = orderedTimeline.LastOrDefault()
+                ?? new Opus.Cachers.AccountMetricPoint { EventTimeUtc = DateTime.UtcNow, Honey = 0m, HiveSize = 0m };
+
+            CurrentHoneyValue.Text = $"{latestPoint.Honey:0}";
+            CurrentHiveValue.Text = $"{latestPoint.HiveSize:0}";
+
+            var cutoffUtc = DateTime.UtcNow - GetLookbackWindow(_selectedAnalyticsRange);
+            var points = orderedTimeline
+                .Where(p => p.EventTimeUtc >= cutoffUtc)
                 .TakeLast(300)
-                .ToList(); 
+                .ToList();
+
             var eventCount = points.Count;
             if (eventCount == 0)
             {
-                points.Add(new Opus.Cachers.AccountMetricPoint { EventTimeUtc = DateTime.UtcNow, Honey = 0m, HiveSize = 0m });
+                points = new List<Opus.Cachers.AccountMetricPoint>
+                {
+                    new Opus.Cachers.AccountMetricPoint { EventTimeUtc = DateTime.UtcNow.AddSeconds(-30), Honey = latestPoint.Honey, HiveSize = latestPoint.HiveSize },
+                    new Opus.Cachers.AccountMetricPoint { EventTimeUtc = DateTime.UtcNow, Honey = latestPoint.Honey, HiveSize = latestPoint.HiveSize },
+                    new Opus.Cachers.AccountMetricPoint { EventTimeUtc = DateTime.UtcNow.AddSeconds(30), Honey = latestPoint.Honey, HiveSize = latestPoint.HiveSize }
+                };
             }
             else if (eventCount == 1)
             {
@@ -440,9 +455,6 @@ namespace Opus
             var honey = points.Select(p => (double)p.Honey).ToList();
             var hive = points.Select(p => (double)p.HiveSize).ToList();
             var xAxisLabels = BuildTimelineLabels(points.Select(p => p.EventTimeUtc).ToList(), eventCount);
-
-            CurrentHoneyValue.Text = $"{honey.LastOrDefault():0}";
-            CurrentHiveValue.Text = $"{hive.LastOrDefault():0}";
 
             var minHoney = honey.Min();
             var maxHoney = honey.Max();
