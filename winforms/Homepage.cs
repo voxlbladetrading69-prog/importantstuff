@@ -542,7 +542,9 @@ namespace Opus
 
         private string[] BuildTimelineLabels(List<DateTime> timestampsUtc, int originalEventCount)
         {
-            if (timestampsUtc.Count == 0) return Array.Empty<string>();
+            if (timestampsUtc.Count == 0)
+                return Array.Empty<string>();
+
             var timeFormat = _selectedAnalyticsRange switch
             {
                 AnalyticsRange.Last24Hours => "HH:mm",
@@ -551,14 +553,27 @@ namespace Opus
                 _ => "HH:mm"
             };
 
+            RefreshAnalyticsRangeButtonStates();
+
+            // For a single-event visualization with 3 padded points, show only the center label.
             if (originalEventCount == 1 && timestampsUtc.Count >= 3)
             {
                 return new[] { "", timestampsUtc[1].ToLocalTime().ToString(timeFormat), "" };
             }
-            RefreshAnalyticsRangeButtonStates();
 
             var labels = Enumerable.Repeat("", timestampsUtc.Count).ToArray();
-            return new[] { "", timestampsUtc[1].ToLocalTime().ToString(timeFormat), "" };
+
+            // For small collections, avoid indexing [1].
+            if (timestampsUtc.Count == 1)
+            {
+                labels[0] = timestampsUtc[0].ToLocalTime().ToString(timeFormat);
+                return labels;
+            }
+
+            // General case: place a label at the middle point.
+            var mid = timestampsUtc.Count / 2;
+            labels[mid] = timestampsUtc[mid].ToLocalTime().ToString(timeFormat);
+
             return labels;
         }
         private void RefreshAnalyticsRangeButtonStates()
