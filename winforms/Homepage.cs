@@ -750,8 +750,14 @@ namespace Opus
         }
         private void DashboardButton_Click(object sender, EventArgs e)
         {
-            SiticoneNetCoreUI.SiticoneDashboardButtonAdvanced btn = sender as SiticoneNetCoreUI.SiticoneDashboardButtonAdvanced;
-            string targetname = btn.Text + "Panel";
+            if (sender is not SiticoneNetCoreUI.SiticoneDashboardButtonAdvanced btn) return;
+            string targetname = btn.Name switch
+            {
+                nameof(HomeButton) => nameof(HomePanel),
+                nameof(DevicesButton) => nameof(DevicesPanel),
+                nameof(SettingsButton) => nameof(SettingsPanel),
+                _ => btn.Text + "Panel"
+            };
             this.Controls.Find(activePanel, true)[0].Hide();
             activePanel = targetname;
             this.Controls.Find(activePanel, true)[0].Show();
@@ -808,44 +814,62 @@ namespace Opus
 
         private void ShowExpiringTokenTutorial()
         {
-            var tutorialSteps = new List<(string Title, string Body, Control FocusControl, bool FocusEnabled)>
+            var tutorialPopupSize = new Size(820, 380);
+            var tutorialOffset = new Point(0, 0); // Change this value if you want to nudge the tutorial position.
+
+            var tutorialSteps = new List<(string Title, string Body, Control FocusControl, bool FocusEnabled, Control? TabButtonToSelect, Point? CustomPosition, Size? CustomSize)>
             {
                 (
-                    "Welcome to Bot Farming",
+                    "Welcome",
                     "This dashboard helps you keep your farming setup stable, monitor account health, and react quickly when a run slows down.",
                     HomePanel,
-                    false
+                    false,
+                    HomeButton,
+                    null,
+                    tutorialPopupSize
                 ),
                 (
                     "How the Game Loop Works",
                     "In bot farming, accounts rotate through scripted actions to gather resources over time. Opus gives you a live view of that cycle so you can spot downtime early.",
                     DevicesPanel,
-                    false
+                    false,
+                    DevicesButton,
+                    null,
+                    tutorialPopupSize
                 ),
                 (
                     "Home Overview",
                     "The Home tab gives you your high-level snapshot: active devices, account status, and quick health indicators.",
                     HomeButton,
-                    true
+                    true,
+                    HomeButton,
+                    tutorialOffset,
+                    tutorialPopupSize
                 ),
                 (
                     "Devices Workspace",
                     "Open Devices to drill into each machine, inspect account/package behavior, and review detailed analytics before making changes.",
                     DevicesButton,
-                    true
+                    true,
+                    DevicesButton,
+                    tutorialOffset,
+                    tutorialPopupSize
                 ),
                 (
                     "Settings & Access",
                     "Use Settings for profile and startup preferences. You can also track your token expiry from the license section so you are never locked out unexpectedly.",
                     SettingsButton,
-                    true
+                    true,
+                    SettingsButton,
+                    tutorialOffset,
+                    tutorialPopupSize
                 )
             };
 
             ShowTutorialStep(tutorialSteps, 0);
         }
 
-        private void ShowTutorialStep(List<(string Title, string Body, Control FocusControl, bool FocusEnabled)> steps, int index)
+        private void ShowTutorialStep(List<(string Title, string Body, Control FocusControl, bool FocusEnabled, Control? TabButtonToSelect, Point? CustomPosition, Size? CustomSize)> steps, int index)
         {
             if (index < 0 || index >= steps.Count)
             {
@@ -853,12 +877,27 @@ namespace Opus
             }
 
             var step = steps[index];
+            if (step.TabButtonToSelect is SiticoneDashboardButtonAdvanced tabButton)
+            {
+                DashboardButton_Click(tabButton, EventArgs.Empty);
+                GradientToggler(tabButton, EventArgs.Empty);
+            }
+
+            Point? popupPosition = step.CustomPosition;
+            if (popupPosition.HasValue)
+            {
+                var centeredX = (ClientSize.Width - (step.CustomSize?.Width ?? 0)) / 2;
+                var centeredY = (ClientSize.Height - (step.CustomSize?.Height ?? 0)) / 2;
+                popupPosition = new Point(centeredX + popupPosition.Value.X, centeredY + popupPosition.Value.Y);
+            }
             var popup = new Popup(
                 image: null,
                 title: step.Title,
                 text: step.Body,
                 focusedControl: step.FocusControl,
-                focusEnabled: step.FocusEnabled);
+                focusEnabled: step.FocusEnabled,
+                customPosition: popupPosition,
+                customSize: step.CustomSize);
 
             popup.WithProceedAction(() =>
             {
