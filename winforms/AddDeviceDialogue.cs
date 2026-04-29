@@ -10,6 +10,7 @@ namespace Opus
         public AddDeviceDialog()
         {
             InitializeComponent();
+            UiRendering.EnableOptimizedDoubleBuffering(this, includeChildren: true);
         }
 
         private void AddButton_Click(object sender, EventArgs e)
