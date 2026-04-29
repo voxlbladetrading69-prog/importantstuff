@@ -19,10 +19,7 @@ namespace Opus
         {
             InitializeComponent();
 
-            this.SetStyle(ControlStyles.UserPaint |
-                          ControlStyles.AllPaintingInWmPaint |
-                          ControlStyles.OptimizedDoubleBuffer, true);
-            this.UpdateStyles();
+            UiRendering.EnableOptimizedDoubleBuffering(this, includeChildren: true);
             this.MouseDown += FormDrag_MouseDown;
             SignInButton.Click += SignInButton_Click;
             _conn =
@@ -137,7 +134,7 @@ namespace Opus
                     400, 0, AnimationFunctions.Liner))
                 .Play(Logo, Animator2D.KnownProperties.Location);
 
-                await Task.Delay(1000);
+                await Task.Delay(400);
 
                 // Expand form to Homepage size and center it on screen,
                 // while moving/resizing the logo into its header position.
@@ -198,12 +195,12 @@ namespace Opus
                 .Play(Logo, Animator2D.KnownProperties.Size);
 
 
-                await Task.Delay(460);
+                await Task.Delay(450);
 
                 // Open homepage in same place
                 Homepage home = new Homepage(matchedToken, preloadedCache, isPreloadUnavailable);
                 home.StartPosition = FormStartPosition.Manual;
-                home.Location = this.Location;
+                home.Location = new Point(targetFormX, targetFormY);
                 home.Opacity = 0;
                 home.Show();
 
