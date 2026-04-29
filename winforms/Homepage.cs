@@ -61,6 +61,7 @@ namespace Opus
         public Homepage(AccessToken? accessToken = null, DeviceCacheService? preloadedCacheService = null, bool initialConnectivityIssue = false)
         {
             InitializeComponent();
+            UiRendering.EnableOptimizedDoubleBuffering(this, includeChildren: true);
             HideSubDashboardHorizontalScrollBar();
             _accessToken = accessToken;
             _welcomeUsername = string.IsNullOrWhiteSpace(accessToken?.Username) ? "User" : accessToken!.Username.Trim();
@@ -833,7 +834,7 @@ namespace Opus
                     "In bot farming, accounts rotate through scripted actions to gather resources over time. Opus gives you a live view of that cycle so you can spot downtime early.",
                     DevicesPanel,
                     false,
-                    DevicesButton,
+                    HomeButton,
                     null,
                     tutorialPopupSize
                 ),
@@ -936,7 +937,7 @@ namespace Opus
             {
                 LicenseStatus.Text = _accessToken.HasElevatedFeedbackAccess ? "ADMIN" : "ACTIVE";
                 LicenseDuration.Text = _accessToken.HasElevatedFeedbackAccess
-                    ? "No expiry (elevated token)"
+                    ? "No expiry"
                     : "No expiry";
                 return;
             }
